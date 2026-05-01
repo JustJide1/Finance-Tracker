@@ -1,0 +1,343 @@
+import { useState, useEffect } from "react";
+import axios from "../api/axios";
+import TransactionFilters from "./TransactionFilters";
+import { useToast } from "./Toast";
+
+
+export default function Income() {
+    const [form, setForm] = useState({ amount: "", category: "", description: "", date: "" });
+    const [editingId, setEditingId] = useState(null);
+    const [allTransactions, setAllTransactions] = useState([]);
+    const [filteredTransactions, setFilteredTransactions] = useState([]);
+    const [loading, setLoading] = useState(false);
+    const [suggesting, setSuggesting] = useState(false);
+    const toast = useToast();
+
+    useEffect(() => {
+        fetchIncomeTransactions();
+    }, []);
+
+    const fetchIncomeTransactions = async () => {
+        try {
+            const { data } = await axios.get("/transactions");
+            const incomeOnly = data.filter(t => t.type === "income");
+            setAllTransactions(incomeOnly);
+            setFilteredTransactions(incomeOnly);
+        } catch (err) {
+            console.error("Failed to fetch transactions");
+        }
+    };
+
+    const handleFilter = (filters) => {
+        const term    = filters.search ? filters.search.toLowerCase() : null;
+        const startMs = filters.startDate ? new Date(filters.startDate).getTime() : null;
+        const endMs   = filters.endDate   ? new Date(filters.endDate).getTime()   : null;
+
+        const filtered = allTransactions.filter(t => {
+            if (term && !t.description.toLowerCase().includes(term) && !t.category.toLowerCase().includes(term)) return false;
+            if (filters.category && t.category !== filters.category) return false;
+            if (startMs !== null && new Date(t.date).getTime() < startMs) return false;
+            if (endMs   !== null && new Date(t.date).getTime() > endMs)   return false;
+            return true;
+        });
+        setFilteredTransactions(filtered);
+    };
+
+    const handleSuggestCategory = async () => {
+        if (!form.description) return toast.error("Enter a description first to get a suggestion");
+        setSuggesting(true);
+        try {
+            const { data } = await axios.post("/ai/suggest-category", { description: form.description });
+            setForm({ ...form, category: data.category });
+        } catch (err) {
+            toast.error("Failed to suggest category");
+        } finally {
+            setSuggesting(false);
+        }
+    };
+
+    const resetForm = () => {
+        setForm({ amount: "", category: "", description: "", date: "" });
+        setEditingId(null);
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!form.amount || !form.category || !form.description || !form.date) {
+            return toast.error("All fields are required");
+        }
+        setLoading(true);
+        try {
+            const payload = {
+                type: "income",
+                amount: parseFloat(form.amount),
+                category: form.category,
+                description: form.description,
+                date: form.date,
+            };
+            if (editingId) {
+                await axios.put(`/transactions/${editingId}`, payload);
+            } else {
+                await axios.post("/transactions", payload);
+            }
+            toast.success(editingId ? "Income updated" : "Income added");
+            resetForm();
+            fetchIncomeTransactions();
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to save income");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleEdit = (transaction) => {
+        setEditingId(transaction._id);
+        setForm({
+            amount: transaction.amount.toString(),
+            category: transaction.category,
+            description: transaction.description,
+            date: new Date(transaction.date).toISOString().split("T")[0],
+        });
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
+
+    const handleDelete = async (id) => {
+        if (!confirm("Delete this income entry?")) return;
+        try {
+            await axios.delete(`/transactions/${id}`);
+            toast.success("Income deleted");
+            fetchIncomeTransactions();
+        } catch (err) {
+            toast.error("Failed to delete");
+        }
+    };
+
+    const uniqueCategories = [...new Set(allTransactions.map(t => t.category))];
+
+    return (
+        <div style={styles.wrapper}>
+            <div style={styles.formCard}>
+                <h3 style={styles.cardTitle}>
+                    {editingId ? "Edit Income Entry" : "Add Income Entry"}
+                </h3>
+                <form onSubmit={handleSubmit} style={styles.form}>
+                    <input
+                        style={styles.input}
+                        type="number"
+                        placeholder="Amount (e.g. 50000)"
+                        value={form.amount}
+                        onChange={(e) => setForm({ ...form, amount: e.target.value })}
+                    />
+                    <input
+                        style={styles.input}
+                        type="text"
+                        placeholder="Description (e.g. Monthly Salary)"
+                        value={form.description}
+                        onChange={(e) => setForm({ ...form, description: e.target.value })}
+                        onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }}
+                    />
+                    <div style={styles.categoryWrapper}>
+                        <input
+                            style={{ ...styles.input, paddingRight: 36 }}
+                            type="text"
+                            placeholder={suggesting ? "AI is categorising..." : "Category"}
+                            value={form.category}
+                            onChange={(e) => setForm({ ...form, category: e.target.value })}
+                            readOnly={suggesting}
+                        />
+                        <button
+                            type="button"
+                            style={styles.categoryBtn}
+                            onClick={handleSuggestCategory}
+                            disabled={suggesting}
+                            title="Re-suggest category with AI"
+                        >
+                            {suggesting ? "..." : "AI"}
+                        </button>
+                    </div>
+                    <input
+                        style={styles.input}
+                        type="date"
+                        value={form.date}
+                        onChange={(e) => setForm({ ...form, date: e.target.value })}
+                    />
+                    <div style={styles.btnGroup}>
+                        {editingId && (
+                            <button type="button" style={styles.btnCancel} onClick={resetForm}>Cancel</button>
+                        )}
+                        <button style={styles.btnSubmit} type="submit" disabled={loading}>
+                            {loading ? "Saving..." : editingId ? "Update" : "Add Income"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <TransactionFilters onFilter={handleFilter} categories={uniqueCategories} />
+
+            <div style={styles.listCard}>
+                <h3 style={styles.cardTitle}>
+                    Income History
+                    {filteredTransactions.length !== allTransactions.length && (
+                        <span style={styles.countBadge}>
+                            {filteredTransactions.length} of {allTransactions.length}
+                        </span>
+                    )}
+                </h3>
+                {filteredTransactions.length === 0 ? (
+                    <p style={styles.empty}>
+                        {allTransactions.length === 0 ? "No income entries yet." : "No matches found."}
+                    </p>
+                ) : (
+                    <div style={styles.list}>
+                        {filteredTransactions.map((t) => (
+                            <div key={t._id} style={{ ...styles.item, ...(editingId === t._id ? styles.itemEditing : {}) }}>
+                                <div style={styles.itemLeft}>
+                                    <div style={styles.itemCategory}>{t.category}</div>
+                                    <div style={styles.itemDesc}>{t.description}</div>
+                                    <div style={styles.itemDate}>{new Date(t.date).toLocaleDateString()}</div>
+                                </div>
+                                <div style={styles.itemRight}>
+                                    <div style={styles.itemAmount}>₦{t.amount.toLocaleString()}</div>
+                                    <div style={styles.itemActions}>
+                                        <button style={styles.btnEdit} onClick={() => handleEdit(t)}>Edit</button>
+                                        <button style={styles.btnDelete} onClick={() => handleDelete(t._id)}>Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
+const styles = {
+    wrapper: { display: "flex", flexDirection: "column", gap: "1.25rem" },
+    formCard: {
+        background: "#1e293b",
+        borderRadius: "clamp(12px, 2vw, 16px)",
+        padding: "clamp(1rem, 3vw, 1.5rem)",
+        border: "1px solid #334155",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+    },
+    cardTitle: {
+        fontSize: 15,
+        fontWeight: 600,
+        color: "#f1f5f9",
+        marginBottom: "1rem",
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+    },
+    countBadge: {
+        fontSize: 12,
+        fontWeight: 400,
+        color: "#64748b",
+        background: "#334155",
+        padding: "2px 8px",
+        borderRadius: 20,
+    },
+    form: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "0.75rem" },
+    input: {
+        padding: "11px 14px",
+        fontSize: 14,
+        border: "1.5px solid #334155",
+        borderRadius: 12,
+        outline: "none",
+        background: "#334155",
+        color: "#f1f5f9",
+        fontFamily: "inherit",
+        width: "100%",
+        boxSizing: "border-box",
+    },
+    categoryWrapper: {
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+    },
+    categoryBtn: {
+        position: "absolute",
+        right: 8,
+        padding: "4px 8px",
+        fontSize: 10,
+        fontWeight: 700,
+        background: "rgba(99,102,241,0.2)",
+        color: "#818cf8",
+        border: "1px solid rgba(99,102,241,0.3)",
+        borderRadius: 6,
+        cursor: "pointer",
+        fontFamily: "inherit",
+        lineHeight: 1.4,
+    },
+    btnGroup: { display: "flex", gap: "0.5rem", gridColumn: "1 / -1" },
+    btnSubmit: {
+        padding: "11px 20px",
+        fontSize: 14,
+        fontWeight: 600,
+        background: "linear-gradient(135deg, #10b981 0%, #059669 100%)",
+        color: "#fff",
+        border: "none",
+        borderRadius: 12,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+    btnCancel: {
+        padding: "11px 14px",
+        fontSize: 14,
+        fontWeight: 500,
+        background: "transparent",
+        color: "#94a3b8",
+        border: "1px solid #334155",
+        borderRadius: 12,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+    listCard: {
+        background: "#1e293b",
+        borderRadius: "clamp(12px, 2vw, 16px)",
+        padding: "clamp(1rem, 3vw, 1.5rem)",
+        border: "1px solid #334155",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+    },
+    empty: { fontSize: 14, color: "#64748b", textAlign: "center", padding: "2rem 0" },
+    list: { display: "flex", flexDirection: "column", gap: "0.625rem" },
+    item: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "0.875rem 1rem",
+        background: "#334155",
+        borderRadius: 12,
+        border: "1px solid transparent",
+        transition: "all 0.2s",
+    },
+    itemEditing: { borderColor: "#10b981", background: "rgba(16,185,129,0.06)" },
+    itemLeft: { flex: 1 },
+    itemCategory: { fontSize: 14, fontWeight: 600, color: "#f1f5f9" },
+    itemDesc: { fontSize: 13, color: "#94a3b8", marginTop: 2 },
+    itemDate: { fontSize: 12, color: "#64748b", marginTop: 4 },
+    itemRight: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" },
+    itemAmount: { fontSize: 15, fontWeight: 700, color: "#10b981" },
+    itemActions: { display: "flex", gap: "0.375rem" },
+    btnEdit: {
+        fontSize: 12,
+        padding: "4px 10px",
+        background: "transparent",
+        border: "1px solid #475569",
+        color: "#94a3b8",
+        borderRadius: 7,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+    btnDelete: {
+        fontSize: 12,
+        padding: "4px 10px",
+        background: "transparent",
+        border: "1px solid rgba(244,63,94,0.3)",
+        color: "#f43f5e",
+        borderRadius: 7,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+};
