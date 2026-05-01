@@ -13,17 +13,23 @@ function QuickAdd({ onSuccess }) {
 
     const handleParse = async (e) => {
         e.preventDefault();
-        if (input.trim().length < 3) {
-            return toast.error("Please enter a longer description");
+        if (input.trim().length < 10) {
+            return toast.error("Please describe the transaction in a few words (e.g. 'Spent 2k on food')");
         }
         const data = await parseTransaction(input);
-        if (data) {
-            if (data.confidence === "high" && data.amount > 0) {
-                await saveTransaction(data);
-                setInput("");
-            } else {
-                setParsed(data);
-            }
+        if (!data) return;
+
+        const hasAmount      = data.amount > 0;
+        const noMissing      = !data.missingFields || data.missingFields.length === 0;
+        const isConfident    = data.confidence === "high" || data.confidence === "medium";
+
+        if (isConfident && hasAmount && noMissing) {
+            // All fields resolved cleanly — save instantly, no confirm screen
+            await saveTransaction(data);
+            setInput("");
+        } else {
+            // Low confidence, zero amount, or missing fields — let user review
+            setParsed(data);
         }
     };
 

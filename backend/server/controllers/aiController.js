@@ -93,9 +93,9 @@ exports.listModels = async (req, res) => {
 exports.parseTransaction = async (req, res) => {
     const { text } = req.body;
 
-    if (!text || text.trim().length < 3) {
+    if (!text || text.trim().length < 10) {
         return res.status(400).json({
-            message: "Please enter a longer description"
+            message: "Description too short — please describe the transaction in a few words"
         });
     }
 

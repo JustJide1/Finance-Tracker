@@ -148,7 +148,13 @@ EXTRACTION RULES:
    - "1m" = 1000000, "500k" = 500000
    - "₦5000" or "5000 naira" = 5000
    - "five thousand" = 5000
-   - RANGE AMOUNTS: If a range is given (e.g. "2k–5k", "between 2k and 5k", "2k to 5k"), use the AVERAGE of the two values. Example: "between 2k and 5k" → 3500
+   - RANGE AMOUNTS: If a range is given, use the AVERAGE of the two values.
+     Supported range patterns:
+     * Shorthand k/m: "2k–5k" or "between 2k and 5k" → average = 3500
+     * Naira symbol: "₦10,000–₦15,000" or "₦10k–₦15k" → average = 12500
+     * Foreign currency range: "$100–$200" → convert each side then average (e.g. (138000+276000)/2 = 207000)
+     * Mixed text: "10 to 20 thousand naira" → average = 15000
+     Always describe range results as "[context] (range avg ₦X)" in the description.
    - FOREIGN CURRENCY CONVERSION (convert to Naira using these approximate rates):
      * USD ($): multiply by 1380. Example: "$50" → 69000
      * GBP (£): multiply by 1890. Example: "£30" → 56700
@@ -189,7 +195,13 @@ Input: "Got my salary 250k yesterday"
 Output: {"type":"income","amount":250000,"category":"Salary","description":"Monthly salary","date":"YESTERDAY_DATE","confidence":"high","missingFields":[]}
 
 Input: "Spent between 2k and 5k on shopping"
-Output: {"type":"expense","amount":3500,"category":"Shopping","description":"Shopping (range avg)","date":"${today}","confidence":"medium","missingFields":[]}
+Output: {"type":"expense","amount":3500,"category":"Shopping","description":"Shopping (range avg ₦3,500)","date":"${today}","confidence":"medium","missingFields":[]}
+
+Input: "Paid ₦10,000–₦15,000 for groceries"
+Output: {"type":"expense","amount":12500,"category":"Food & Dining","description":"Groceries (range avg ₦12,500)","date":"${today}","confidence":"medium","missingFields":[]}
+
+Input: "Bought clothes for $100–$200"
+Output: {"type":"expense","amount":207000,"category":"Shopping","description":"Clothes ($100–$200 → range avg ₦207,000)","date":"${today}","confidence":"medium","missingFields":[]}
 
 Input: "Spent $50 on groceries"
 Output: {"type":"expense","amount":80000,"category":"Food & Dining","description":"Groceries ($50 → ₦80,000)","date":"${today}","confidence":"high","missingFields":[]}
@@ -258,23 +270,86 @@ Now parse this input:
         }
 
         if (!detectedFx) {
-            // ── Naira range detection ("between 2k and 5k" / "2k-5k") ────────
-            const rangeMatch = lower.match(/(\d+\.?\d*)\s*k?\s*(?:to|-|–|and)\s*(\d+\.?\d*)\s*k/i);
-            if (rangeMatch) {
-                const lo = parseFloat(rangeMatch[1]) * (lower.indexOf('k') < lower.indexOf(rangeMatch[1]) ? 1 : 1000);
-                const hi = parseFloat(rangeMatch[2]) * 1000;
-                // Simpler: both sides multiplied by 1000 if 'k' suffix present
-                const loVal = lower.match(new RegExp(rangeMatch[1] + '\\s*k')) ? parseFloat(rangeMatch[1]) * 1000 : parseFloat(rangeMatch[1]);
-                amount = Math.round((loVal + hi) / 2);
-            } else {
-                // ── Standard Naira amount detection ──────────────────────────
+            // ── Unified range + amount detection ──────────────────────────────
+            //
+            // parseAmount(raw, inheritedSuffix, fxRate):
+            //   - strips ₦ and commas
+            //   - resolves explicit k/m suffix
+            //   - if no suffix found, falls back to inheritedSuffix (fixes "12-15k" → 12000, 15000)
+            const parseAmount = (raw, inheritedSuffix = null, fxRate = null) => {
+                if (!raw) return null;
+                const clean = raw.replace(/[₦,\s]/g, "");
+                const kMatch = clean.match(/^(\d+\.?\d*)k$/i);
+                const mMatch = clean.match(/^(\d+\.?\d*)m$/i);
+                let num;
+                if      (kMatch)                   num = parseFloat(kMatch[1]) * 1000;
+                else if (mMatch)                   num = parseFloat(mMatch[1]) * 1_000_000;
+                else if (inheritedSuffix === "k")  num = parseFloat(clean) * 1000;
+                else if (inheritedSuffix === "m")  num = parseFloat(clean) * 1_000_000;
+                else                               num = parseFloat(clean);
+                if (isNaN(num)) return null;
+                return fxRate ? Math.round(num * fxRate) : num;
+            };
+
+            // Helper: extract the trailing k/m suffix from a raw token (if present)
+            const getSuffix = (raw) => raw.trim().match(/([km])$/i)?.[1]?.toLowerCase() || null;
+
+            // 1) Foreign-currency range: "$100–$200", "£50-£80"
+            const FX_RANGE = [
+                { sym: /\$/g,   rate: 1380, label: "$"   },
+                { sym: /£/g,    rate: 1890, label: "£"   },
+                { sym: /€/g,    rate: 1630, label: "€"   },
+                { sym: /cad/gi, rate: 1030, label: "CAD" },
+            ];
+            let rangeDetected = false;
+            for (const fx of FX_RANGE) {
+                const rePair = new RegExp(
+                    fx.sym.source + "\\s*(\\d[\\d,]*\\.?\\d*)" +
+                    "\\s*(?:[-\u2013\u2014]|\\bto\\b|\\band\\b)\\s*" +
+                    fx.sym.source + "\\s*(\\d[\\d,]*\\.?\\d*)", "i"
+                );
+                const m = text.match(rePair);
+                if (m) {
+                    const lo = parseAmount(m[1], null, fx.rate);
+                    const hi = parseAmount(m[2], null, fx.rate);
+                    if (lo !== null && hi !== null) {
+                        amount = Math.round((lo + hi) / 2);
+                        foreignNote = ` (${fx.label}${m[1]}–${fx.label}${m[2]} → range avg ₦${amount.toLocaleString()})`;
+                        rangeDetected = true;
+                        break;
+                    }
+                }
+            }
+
+            if (!rangeDetected) {
+                // 2) Naira / plain range: "₦10,000–₦15,000", "10k–15k", "12-15k", "between 2k and 5k"
+                const reNairaRange = /(?:₦\s*)?(\d[\d,]*\.?\d*\s*[km]?)\s*(?:[-\u2013\u2014]|\bto\b|\band\b)\s*(?:₦\s*)?(\d[\d,]*\.?\d*\s*[km]?)/i;
+                const nm = lower.match(reNairaRange);
+                if (nm) {
+                    const loRaw = nm[1].trim();
+                    const hiRaw = nm[2].trim();
+                    // If lo has no k/m but hi does, inherit hi's suffix (e.g. "12-15k" → both k)
+                    const hiSuffix  = getSuffix(hiRaw);
+                    const loSuffix  = getSuffix(loRaw);
+                    const inherited = loSuffix ? null : hiSuffix;
+                    const lo = parseAmount(loRaw, inherited);
+                    const hi = parseAmount(hiRaw);
+                    if (lo !== null && hi !== null && (lo > 0 || hi > 0)) {
+                        amount = Math.round((lo + hi) / 2);
+                        rangeDetected = true;
+                    }
+                }
+            }
+
+            if (!rangeDetected) {
+                // 3) Standard single-amount detection
                 const mMatch = lower.match(/(\d+\.?\d*)\s*m(?!\w)/);
                 const kMatch = lower.match(/(\d+\.?\d*)\s*k(?!\w)/);
-                const numMatch = lower.match(/₦?\s*(\d{2,})/);
+                const nMatch = lower.match(/₦?\s*(\d[\d,]{1,})/);
 
-                if (mMatch) amount = parseFloat(mMatch[1]) * 1000000;
+                if (mMatch)      amount = parseFloat(mMatch[1]) * 1_000_000;
                 else if (kMatch) amount = parseFloat(kMatch[1]) * 1000;
-                else if (numMatch) amount = parseInt(numMatch[1]);
+                else if (nMatch) amount = parseInt(nMatch[1].replace(/,/g, ""));
             }
         }
 

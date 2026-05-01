@@ -45,8 +45,8 @@ export default function Recurring() {
         setForm({
             type: rec.type, amount: rec.amount.toString(), category: rec.category,
             description: rec.description, frequency: rec.frequency,
-            startDate: new Date(rec.startDate).toISOString().split("T")[0],
-            endDate: rec.endDate ? new Date(rec.endDate).toISOString().split("T")[0] : "",
+            startDate: rec.startDate ? rec.startDate.slice(0, 10) : new Date().toISOString().split("T")[0],
+            endDate:   rec.endDate   ? rec.endDate.slice(0, 10)   : "",
         });
     };
 

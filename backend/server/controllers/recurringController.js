@@ -50,15 +50,16 @@ exports.updateRecurring = async (req, res) => {
             return res.status(404).json({ message: "Recurring rule not found" });
         }
 
-        const { type, amount, category, description, frequency, endDate, isActive } = req.body;
+        const { type, amount, category, description, frequency, startDate, endDate, isActive } = req.body;
 
-        if (type) recurring.type = type;
-        if (amount) recurring.amount = amount;
-        if (category) recurring.category = category;
-        if (description) recurring.description = description;
-        if (frequency) recurring.frequency = frequency;
-        if (endDate !== undefined) recurring.endDate = endDate;
-        if (isActive !== undefined) recurring.isActive = isActive;
+        if (type)                    recurring.type        = type;
+        if (amount)                  recurring.amount      = amount;
+        if (category)                recurring.category    = category;
+        if (description)             recurring.description = description;
+        if (frequency)               recurring.frequency   = frequency;
+        if (startDate)               recurring.startDate   = startDate;
+        if (endDate !== undefined)   recurring.endDate     = endDate;
+        if (isActive !== undefined)  recurring.isActive    = isActive;
 
         await recurring.save();
         res.json(recurring);
