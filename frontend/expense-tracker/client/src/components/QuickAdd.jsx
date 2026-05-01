@@ -123,7 +123,9 @@ function QuickAdd({ onSuccess }) {
                                     <input
                                         style={styles.fieldInput}
                                         type={type}
-                                        value={parsed[field]}
+                                        value={field === "amount" && parsed[field] === 0 ? "" : parsed[field]}
+                                        placeholder={field === "amount" ? "Enter amount" : undefined}
+                                        onFocus={field === "amount" ? (e) => e.target.select() : undefined}
                                         onChange={(e) => handleEdit(field, type === "number" ? parseFloat(e.target.value) || 0 : e.target.value)}
                                     />
                                 )}

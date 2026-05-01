@@ -17,6 +17,8 @@ exports.categorizeTransaction = async (description) => {
 - Salary
 - Business
 - Gifts
+- Family Support
+- Personal Care
 - Other
 
 Transaction description: "${description}"
@@ -141,17 +143,26 @@ EXTRACTION RULES:
    - Expense keywords: spent, bought, paid, used, cost
    - Default to "expense" if unclear but money was used
 
-2. AMOUNT: Extract the numeric value in Naira
+2. AMOUNT: Extract the numeric value in Naira (NGN)
    - "1k" = 1000, "1.5k" = 1500, "2k" = 2000
    - "1m" = 1000000, "500k" = 500000
    - "₦5000" or "5000 naira" = 5000
    - "five thousand" = 5000
-   - Always return as number
+   - RANGE AMOUNTS: If a range is given (e.g. "2k–5k", "between 2k and 5k", "2k to 5k"), use the AVERAGE of the two values. Example: "between 2k and 5k" → 3500
+   - FOREIGN CURRENCY CONVERSION (convert to Naira using these approximate rates):
+     * USD ($): multiply by 1380. Example: "$50" → 69000
+     * GBP (£): multiply by 1890. Example: "£30" → 56700
+     * EUR (€): multiply by 1630. Example: "€20" → 32600
+     * CAD: multiply by 1030. Example: "CAD 100" → 103000
+   - When converting foreign currency, note the original amount in the description
+   - Always return as number (Naira equivalent)
 
 3. CATEGORY: Choose the BEST match from this list ONLY:
-   Food & Dining, Transportation, Shopping, Entertainment, Bills & Utilities, Healthcare, Education, Investment, Salary, Business, Gifts, Other
+   Food & Dining, Transportation, Shopping, Entertainment, Bills & Utilities, Healthcare, Education, Investment, Salary, Business, Gifts, Family Support, Personal Care, Other
+   - Family Support: money sent to family, supporting parents/siblings, remittance
+   - Personal Care: haircut, salon, spa, grooming, skincare, cosmetics, barbing
 
-4. DESCRIPTION: Create a clean, concise description (3-8 words)
+4. DESCRIPTION: Create a clean, concise description (3-8 words). If currency was converted, include the original amount, e.g. "Groceries ($50 → ₦80,000)"
 
 5. DATE: Today's date is ${today}
    - "today" → ${today}
@@ -176,6 +187,18 @@ Output: {"type":"expense","amount":1000,"category":"Food & Dining","description"
 
 Input: "Got my salary 250k yesterday"
 Output: {"type":"income","amount":250000,"category":"Salary","description":"Monthly salary","date":"YESTERDAY_DATE","confidence":"high","missingFields":[]}
+
+Input: "Spent between 2k and 5k on shopping"
+Output: {"type":"expense","amount":3500,"category":"Shopping","description":"Shopping (range avg)","date":"${today}","confidence":"medium","missingFields":[]}
+
+Input: "Spent $50 on groceries"
+Output: {"type":"expense","amount":80000,"category":"Food & Dining","description":"Groceries ($50 → ₦80,000)","date":"${today}","confidence":"high","missingFields":[]}
+
+Input: "Sent 10k to mum"
+Output: {"type":"expense","amount":10000,"category":"Family Support","description":"Money sent to mum","date":"${today}","confidence":"high","missingFields":[]}
+
+Input: "Haircut 3k"
+Output: {"type":"expense","amount":3000,"category":"Personal Care","description":"Haircut","date":"${today}","confidence":"high","missingFields":[]}
 
 Input: "Bought stuff"
 Output: {"type":"expense","amount":0,"category":"Other","description":"Unspecified purchase","date":"${today}","confidence":"low","missingFields":["amount","specific category","description"]}
@@ -212,15 +235,48 @@ Now parse this input:
         const isIncome = /received|earned|got paid|salary|profit|made/.test(lower);
         const type = isIncome ? "income" : "expense";
 
-        // Extract amount
+        // ── Foreign currency detection ──────────────────────────────────────
+        const FOREX = [
+            { regex: /\$\s*(\d+\.?\d*)/, rate: 1380, symbol: "$" },
+            { regex: /£\s*(\d+\.?\d*)/, rate: 1890, symbol: "£" },
+            { regex: /€\s*(\d+\.?\d*)/, rate: 1630, symbol: "€" },
+            { regex: /cad\s*(\d+\.?\d*)/i, rate: 1030, symbol: "CAD" },
+        ];
+        let foreignNote = "";
         let amount = 0;
-        const kMatch = lower.match(/(\d+\.?\d*)\s*k/);
-        const mMatch = lower.match(/(\d+\.?\d*)\s*m/);
-        const numMatch = lower.match(/₦?\s*(\d{2,})/);
+        let detectedFx = false;
 
-        if (mMatch) amount = parseFloat(mMatch[1]) * 1000000;
-        else if (kMatch) amount = parseFloat(kMatch[1]) * 1000;
-        else if (numMatch) amount = parseInt(numMatch[1]);
+        for (const fx of FOREX) {
+            const m = lower.match(fx.regex) || text.match(fx.regex);
+            if (m) {
+                const foreign = parseFloat(m[1]);
+                amount = Math.round(foreign * fx.rate);
+                foreignNote = ` (${fx.symbol}${foreign} → ₦${amount.toLocaleString()})`;
+                detectedFx = true;
+                break;
+            }
+        }
+
+        if (!detectedFx) {
+            // ── Naira range detection ("between 2k and 5k" / "2k-5k") ────────
+            const rangeMatch = lower.match(/(\d+\.?\d*)\s*k?\s*(?:to|-|–|and)\s*(\d+\.?\d*)\s*k/i);
+            if (rangeMatch) {
+                const lo = parseFloat(rangeMatch[1]) * (lower.indexOf('k') < lower.indexOf(rangeMatch[1]) ? 1 : 1000);
+                const hi = parseFloat(rangeMatch[2]) * 1000;
+                // Simpler: both sides multiplied by 1000 if 'k' suffix present
+                const loVal = lower.match(new RegExp(rangeMatch[1] + '\\s*k')) ? parseFloat(rangeMatch[1]) * 1000 : parseFloat(rangeMatch[1]);
+                amount = Math.round((loVal + hi) / 2);
+            } else {
+                // ── Standard Naira amount detection ──────────────────────────
+                const mMatch = lower.match(/(\d+\.?\d*)\s*m(?!\w)/);
+                const kMatch = lower.match(/(\d+\.?\d*)\s*k(?!\w)/);
+                const numMatch = lower.match(/₦?\s*(\d{2,})/);
+
+                if (mMatch) amount = parseFloat(mMatch[1]) * 1000000;
+                else if (kMatch) amount = parseFloat(kMatch[1]) * 1000;
+                else if (numMatch) amount = parseInt(numMatch[1]);
+            }
+        }
 
         // Detect date
         let date = today;
@@ -230,10 +286,10 @@ Now parse this input:
             date = d.toISOString().split("T")[0];
         }
 
-        // Detect category (reuse existing logic)
+        // Detect category
         let category = "Other";
         if (/uber|bolt|taxi|bus|transport|fuel|petrol|keke|okada/.test(lower)) category = "Transportation";
-        else if (/shoprite|spar|food|eat|restaurant|suya|rice|jollof/.test(lower)) category = "Food & Dining";
+        else if (/shoprite|spar|food|eat|restaurant|suya|rice|jollof|lunch|dinner|breakfast/.test(lower)) category = "Food & Dining";
         else if (/netflix|spotify|cinema|movie|game|dstv/.test(lower)) category = "Entertainment";
         else if (/nepa|electricity|water|internet|wifi|mtn|airtel|glo|bill/.test(lower)) category = "Bills & Utilities";
         else if (/hospital|pharmacy|doctor|clinic|drug|medicine/.test(lower)) category = "Healthcare";
@@ -241,16 +297,20 @@ Now parse this input:
         else if (/salary|wages|payment|freelance/.test(lower)) category = "Salary";
         else if (/invest|stock|crypto|savings/.test(lower)) category = "Investment";
         else if (/amazon|jumia|konga|shopping|clothes/.test(lower)) category = "Shopping";
+        else if (/mum|mom|dad|father|mother|parent|sibling|brother|sister|family|sent to|send to|support/.test(lower)) category = "Family Support";
+        else if (/salon|barber|haircut|spa|grooming|skincare|beauty|personal care|cosmetics|manicure|pedicure|barbing/.test(lower)) category = "Personal Care";
 
         const missingFields = [];
         if (!amount) missingFields.push("amount");
         if (category === "Other") missingFields.push("category");
 
+        const description = (text.slice(0, 45) + foreignNote).slice(0, 80);
+
         return {
             type,
             amount,
             category,
-            description: text.slice(0, 50),
+            description,
             date,
             confidence: amount && category !== "Other" ? "medium" : "low",
             missingFields,

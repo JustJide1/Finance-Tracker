@@ -251,7 +251,7 @@ const styles = {
     btnSubmit: { padding: "11px 20px", fontSize: 14, fontWeight: 600, color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", fontFamily: "inherit" },
     btnCancel: { padding: "11px 14px", fontSize: 14, fontWeight: 500, background: "transparent", color: "#94a3b8", border: "1px solid #334155", borderRadius: 12, cursor: "pointer", fontFamily: "inherit" },
     empty: { fontSize: 14, color: "#64748b", textAlign: "center", padding: "2rem 0" },
-    list: { display: "flex", flexDirection: "column", gap: "0.625rem" },
+    list: { display: "flex", flexDirection: "column", gap: "0.625rem", maxHeight: "420px", overflowY: "auto", paddingRight: "4px" },
     item: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "0.875rem 1rem", background: "#334155", borderRadius: 12, border: "1px solid transparent", transition: "all 0.2s" },
     itemLeft: { flex: 1 },
     itemCategory: { fontSize: 14, fontWeight: 600, color: "#f1f5f9" },

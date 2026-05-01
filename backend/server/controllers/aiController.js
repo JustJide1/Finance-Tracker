@@ -115,7 +115,7 @@ const categorizeByRules = (description) => {
 
     if (/uber|bolt|taxi|bus|transport|fuel|petrol|keke|okada|train/.test(desc))
         return "Transportation";
-    if (/shoprite|spar|market|grocery|food|eat|restaurant|suya|chicken|rice|bread/.test(desc))
+    if (/shoprite|spar|market|grocery|food|eat|restaurant|suya|chicken|rice|bread|lunch|dinner|breakfast/.test(desc))
         return "Food & Dining";
     if (/netflix|spotify|cinema|movie|game|dstv|gotv|showmax|entertainment/.test(desc))
         return "Entertainment";
@@ -131,6 +131,10 @@ const categorizeByRules = (description) => {
         return "Investment";
     if (/amazon|jumia|konga|shopping|clothes|fashion|shoe/.test(desc))
         return "Shopping";
+    if (/mum|mom|dad|father|mother|parent|sibling|brother|sister|family|sent to|send to|support/.test(desc))
+        return "Family Support";
+    if (/salon|barber|haircut|spa|grooming|skincare|beauty|personal care|cosmetics|manicure|pedicure|barbing/.test(desc))
+        return "Personal Care";
 
     return "Other";
 };
@@ -149,6 +153,8 @@ exports.categorizeTransaction = async (description) => {
 - Salary
 - Business
 - Gifts
+- Family Support
+- Personal Care
 - Other
 
 Transaction description: "${description}"

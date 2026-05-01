@@ -301,7 +301,7 @@ const styles = {
         boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
     },
     empty: { fontSize: 14, color: "#64748b", textAlign: "center", padding: "2rem 0" },
-    list: { display: "flex", flexDirection: "column", gap: "0.625rem" },
+    list: { display: "flex", flexDirection: "column", gap: "0.625rem", maxHeight: "420px", overflowY: "auto", paddingRight: "4px" },
     item: {
         display: "flex",
         justifyContent: "space-between",
