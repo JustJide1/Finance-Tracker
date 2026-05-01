@@ -67,3 +67,50 @@ input[type="date"]::-webkit-calendar-picker-indicator {
         display: flex !important;
     }
 }
+
+/* ── Global themed scrollbar (all scrollable elements) ─────────────────── */
+* {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+}
+
+*::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;          /* horizontal scrollbars, if any */
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: #475569;
+}
+
+/* ── Utility override — keep for explicit thin-scroll usage ─────────────── */
+.thin-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: #334155 transparent;
+}
+
+.thin-scroll::-webkit-scrollbar {
+    width: 4px;
+}
+
+.thin-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb {
+    background: #334155;
+    border-radius: 999px;
+}
+
+.thin-scroll::-webkit-scrollbar-thumb:hover {
+    background: #6366f1;
+}

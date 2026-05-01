@@ -182,7 +182,7 @@ export default function TransactionPage({ type }) {
                             : "No matches found."}
                     </p>
                 ) : (
-                    <div style={styles.list}>
+                    <div style={styles.list} className="thin-scroll">
                         {filteredTransactions.map((t) => (
                             <div key={t._id} style={itemStyle(t)}>
                                 <div style={styles.itemLeft}>

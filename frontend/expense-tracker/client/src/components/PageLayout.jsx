@@ -50,7 +50,7 @@ export default function PageLayout({
                 <div style={styles.overlay} onClick={() => setSidebarOpen(false)} />
             )}
 
-            <div style={styles.main}>
+            <div style={styles.main} className="thin-scroll">
                 <header style={styles.header}>
                     <div style={styles.headerLeft}>
                         <button

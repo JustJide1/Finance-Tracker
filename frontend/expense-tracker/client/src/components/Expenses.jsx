@@ -188,7 +188,7 @@ export default function Expenses() {
                         {allTransactions.length === 0 ? "No expenses yet." : "No matches found."}
                     </p>
                 ) : (
-                    <div style={styles.list}>
+                    <div style={styles.list} className="thin-scroll">
                         {filteredTransactions.map((t) => (
                             <div key={t._id} style={{ ...styles.item, ...(editingId === t._id ? styles.itemEditing : {}) }}>
                                 <div style={styles.itemLeft}>
