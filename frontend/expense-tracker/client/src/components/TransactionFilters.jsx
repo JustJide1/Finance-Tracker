@@ -8,13 +8,10 @@ export default function TransactionFilters({ onFilter, categories = [] }) {
     const handleChange = (key, value) => {
         const updated = { ...filters, [key]: value };
         setFilters(updated);
-
         if (key === "search") {
-            // Debounce free-text search — fire only after user stops typing
             clearTimeout(searchTimer.current);
             searchTimer.current = setTimeout(() => onFilter(updated), 300);
         } else {
-            // Category and date pickers are discrete — fire immediately
             onFilter(updated);
         }
     };
@@ -28,11 +25,11 @@ export default function TransactionFilters({ onFilter, categories = [] }) {
     const hasActiveFilters = filters.search || filters.category || filters.startDate || filters.endDate;
 
     return (
-        <div style={styles.wrapper}>
-            <div style={styles.searchRow}>
-                <div style={styles.searchWrapper}>
+        <div style={S.wrapper}>
+            <div style={S.searchRow}>
+                <div style={S.searchWrapper}>
                     <input
-                        style={styles.searchInput}
+                        style={S.searchInput}
                         type="text"
                         placeholder="Search by description or category..."
                         value={filters.search}
@@ -40,48 +37,32 @@ export default function TransactionFilters({ onFilter, categories = [] }) {
                     />
                 </div>
                 <button
-                    style={{ ...styles.filterToggle, ...(expanded ? styles.filterToggleActive : {}) }}
+                    style={{ ...S.filterToggle, ...(expanded ? S.filterToggleActive : {}) }}
                     onClick={() => setExpanded(!expanded)}
                 >
-                    Filters {hasActiveFilters && <span style={styles.activeDot} />}
+                    Filters {hasActiveFilters && <span style={S.activeDot} />}
                 </button>
                 {hasActiveFilters && (
-                    <button style={styles.resetBtn} onClick={handleReset}>Clear</button>
+                    <button style={S.resetBtn} onClick={handleReset}>Clear</button>
                 )}
             </div>
 
             {expanded && (
-                <div style={styles.filtersGrid}>
-                    <div style={styles.field}>
-                        <label style={styles.label}>Category</label>
-                        <select
-                            style={styles.input}
-                            value={filters.category}
-                            onChange={(e) => handleChange("category", e.target.value)}
-                        >
+                <div style={S.filtersGrid}>
+                    <div style={S.field}>
+                        <label style={S.label}>Category</label>
+                        <select style={S.input} value={filters.category} onChange={(e) => handleChange("category", e.target.value)}>
                             <option value="">All categories</option>
-                            {categories.map((cat) => (
-                                <option key={cat} value={cat}>{cat}</option>
-                            ))}
+                            {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                     </div>
-                    <div style={styles.field}>
-                        <label style={styles.label}>From</label>
-                        <input
-                            style={styles.input}
-                            type="date"
-                            value={filters.startDate}
-                            onChange={(e) => handleChange("startDate", e.target.value)}
-                        />
+                    <div style={S.field}>
+                        <label style={S.label}>From</label>
+                        <input style={S.input} type="date" value={filters.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
                     </div>
-                    <div style={styles.field}>
-                        <label style={styles.label}>To</label>
-                        <input
-                            style={styles.input}
-                            type="date"
-                            value={filters.endDate}
-                            onChange={(e) => handleChange("endDate", e.target.value)}
-                        />
+                    <div style={S.field}>
+                        <label style={S.label}>To</label>
+                        <input style={S.input} type="date" value={filters.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
                     </div>
                 </div>
             )}
@@ -89,13 +70,13 @@ export default function TransactionFilters({ onFilter, categories = [] }) {
     );
 }
 
-const styles = {
+const S = {
     wrapper: {
-        background: "#1e293b",
+        background: "#FFFFFF",
         borderRadius: "clamp(12px, 2vw, 16px)",
         padding: "1rem",
-        border: "1px solid #334155",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+        border: "1px solid #E5E7EB",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
     },
     searchRow: { display: "flex", gap: "0.5rem", alignItems: "center", flexWrap: "wrap" },
     searchWrapper: { flex: 1, minWidth: 200 },
@@ -103,11 +84,11 @@ const styles = {
         width: "100%",
         padding: "10px 14px",
         fontSize: 14,
-        border: "1.5px solid #334155",
+        border: "1.5px solid #E5E7EB",
         borderRadius: 10,
         outline: "none",
-        background: "#334155",
-        color: "#f1f5f9",
+        background: "#F9FAFB",
+        color: "#111111",
         boxSizing: "border-box",
         fontFamily: "inherit",
     },
@@ -115,11 +96,11 @@ const styles = {
         padding: "10px 16px",
         fontSize: 13,
         fontWeight: 500,
-        background: "#334155",
-        border: "1.5px solid #475569",
+        background: "#F9FAFB",
+        border: "1.5px solid #E5E7EB",
         borderRadius: 10,
         cursor: "pointer",
-        color: "#94a3b8",
+        color: "#6B7280",
         display: "flex",
         alignItems: "center",
         gap: 6,
@@ -127,15 +108,15 @@ const styles = {
         position: "relative",
     },
     filterToggleActive: {
-        background: "rgba(99,102,241,0.12)",
-        borderColor: "#6366f1",
-        color: "#818cf8",
+        background: "rgba(45,106,79,0.08)",
+        borderColor: "#2D6A4F",
+        color: "#2D6A4F",
     },
     activeDot: {
         width: 7,
         height: 7,
         borderRadius: "50%",
-        background: "#6366f1",
+        background: "#2D6A4F",
         display: "inline-block",
     },
     resetBtn: {
@@ -143,10 +124,10 @@ const styles = {
         fontSize: 13,
         fontWeight: 500,
         background: "transparent",
-        border: "1.5px solid rgba(244,63,94,0.3)",
+        border: "1.5px solid rgba(220,38,38,0.3)",
         borderRadius: 10,
         cursor: "pointer",
-        color: "#f43f5e",
+        color: "#DC2626",
         fontFamily: "inherit",
     },
     filtersGrid: {
@@ -155,13 +136,13 @@ const styles = {
         gap: "0.75rem",
         marginTop: "1rem",
         paddingTop: "1rem",
-        borderTop: "1px solid #334155",
+        borderTop: "1px solid #E5E7EB",
     },
     field: { display: "flex", flexDirection: "column" },
     label: {
         fontSize: 11,
         fontWeight: 600,
-        color: "#64748b",
+        color: "#9CA3AF",
         marginBottom: 4,
         textTransform: "uppercase",
         letterSpacing: "0.05em",
@@ -169,11 +150,11 @@ const styles = {
     input: {
         padding: "9px 12px",
         fontSize: 13,
-        border: "1.5px solid #334155",
+        border: "1.5px solid #E5E7EB",
         borderRadius: 10,
         outline: "none",
-        background: "#334155",
-        color: "#f1f5f9",
+        background: "#F9FAFB",
+        color: "#111111",
         fontFamily: "inherit",
     },
 };

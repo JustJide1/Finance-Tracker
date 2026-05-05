@@ -59,12 +59,42 @@ export const useTransactions = (type) => {
         }
     };
 
+    const deleteAllExpenses = async () => {
+        setLoading(true);
+        try {
+            await transactionService.deleteAllExpenses();
+            toast.success("All expenses cleared");
+            await fetchTransactions();
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to clear expenses");
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const deleteAllIncome = async () => {
+        setLoading(true);
+        try {
+            await transactionService.deleteAllIncome();
+            toast.success("All income cleared");
+            await fetchTransactions();
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to clear income");
+            throw err;
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return {
         transactions,
         loading,
         fetchTransactions,
         createTransaction,
         updateTransaction,
-        deleteTransaction
+        deleteTransaction,
+        deleteAllExpenses,
+        deleteAllIncome
     };
 };

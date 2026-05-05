@@ -1,7 +1,154 @@
-import { useState, memo } from "react";
+import { useState, useCallback, memo } from "react";
 import { useTransactions } from "../hooks/useTransactions";
 import { useAI } from "../hooks/useAI";
 import { useToast } from "./Toast";
+
+const EXAMPLES = ["Spent 2k on lunch today", "Got paid 10k for salary"];
+
+const REVIEW_FIELDS = [
+    { label: "Type", field: "type", type: "select", options: ["expense", "income"] },
+    { label: "Amount (₦)", field: "amount", type: "number" },
+    { label: "Category", field: "category", type: "text" },
+    { label: "Description", field: "description", type: "text" },
+    { label: "Date", field: "date", type: "date" },
+];
+
+const S = {
+    card: {
+        background: "#FFFFFF",
+        borderRadius: "clamp(12px, 2vw, 16px)",
+        padding: "clamp(1rem, 3vw, 1.5rem)",
+        border: "1px solid #E5E7EB",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    },
+    header: { marginBottom: "1.25rem" },
+    title: { fontSize: 15, fontWeight: 600, color: "#111111", margin: 0 },
+    subtitle: { fontSize: 12, color: "#9CA3AF", margin: "3px 0 0" },
+    form: { display: "flex", gap: "0.5rem", marginBottom: "0.875rem" },
+    input: {
+        flex: 1,
+        padding: "11px 14px",
+        fontSize: 14,
+        border: "1.5px solid #E5E7EB",
+        borderRadius: 12,
+        background: "#F9FAFB",
+        color: "#111111",
+        outline: "none",
+        fontFamily: "inherit",
+    },
+    btn: {
+        padding: "11px 24px",
+        fontSize: 14,
+        fontWeight: 600,
+        background: "linear-gradient(135deg, #1A4731 0%, #2D6A4F 100%)",
+        color: "#fff",
+        border: "none",
+        borderRadius: 12,
+        cursor: "pointer",
+        minWidth: 80,
+        fontFamily: "inherit",
+    },
+    examples: { display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" },
+    examplesLabel: { fontSize: 12, color: "#9CA3AF" },
+    exampleChip: {
+        fontSize: 12,
+        padding: "5px 11px",
+        background: "rgba(45,106,79,0.08)",
+        border: "1px solid rgba(45,106,79,0.18)",
+        color: "#2D6A4F",
+        borderRadius: 20,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+    review: {
+        marginTop: "1rem",
+        padding: "1.25rem",
+        background: "#F9FAFB",
+        borderRadius: 12,
+        border: "1px solid #E5E7EB",
+    },
+    reviewHeader: { marginBottom: "1rem" },
+    confidenceBadge: { display: "inline-block", fontSize: 11, fontWeight: 600, padding: "4px 10px", borderRadius: 20 },
+    missing: { fontSize: 12, color: "#9CA3AF", margin: "8px 0 0" },
+    reviewFields: {
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
+        gap: "0.75rem",
+        marginBottom: "1rem",
+    },
+    field: { display: "flex", flexDirection: "column" },
+    label: { fontSize: 11, fontWeight: 600, color: "#9CA3AF", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.05em" },
+    fieldInput: {
+        padding: "9px 12px",
+        fontSize: 13,
+        border: "1.5px solid #E5E7EB",
+        borderRadius: 10,
+        outline: "none",
+        background: "#FFFFFF",
+        color: "#111111",
+        fontFamily: "inherit",
+    },
+    actions: { display: "flex", gap: "0.5rem", justifyContent: "flex-end" },
+    btnCancel: {
+        padding: "9px 18px",
+        fontSize: 13,
+        fontWeight: 500,
+        background: "transparent",
+        color: "#6B7280",
+        border: "1px solid #E5E7EB",
+        borderRadius: 10,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+    btnConfirm: {
+        padding: "9px 18px",
+        fontSize: 13,
+        fontWeight: 600,
+        background: "linear-gradient(135deg, #1A4731 0%, #2D6A4F 100%)",
+        color: "#fff",
+        border: "none",
+        borderRadius: 10,
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+};
+
+const CONFIDENCE_STYLES = {
+    high: { ...S.confidenceBadge, background: "rgba(45,106,79,0.10)", color: "#2D6A4F" },
+    medium: { ...S.confidenceBadge, background: "rgba(217,119,6,0.10)", color: "#D97706" },
+    low: { ...S.confidenceBadge, background: "rgba(220,38,38,0.08)", color: "#DC2626" },
+};
+
+const ExampleChip = memo(({ text, onClick }) => {
+    const handleClick = useCallback(() => onClick(text), [onClick, text]);
+    return <button style={S.exampleChip} onClick={handleClick}>{text}</button>;
+});
+
+const ParsedField = memo(({ field, label, type, options, value, onChange }) => {
+    const handleChange = useCallback((e) => {
+        onChange(field, type === "number" ? parseFloat(e.target.value) || 0 : e.target.value);
+    }, [field, type, onChange]);
+
+    return (
+        <div style={S.field}>
+            <label style={S.label}>{label}</label>
+            {type === "select" ? (
+                <select style={S.fieldInput} value={value} onChange={handleChange}>
+                    {options.map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+            ) : (
+                <input
+                    style={S.fieldInput}
+                    type={type}
+                    value={type === "number" && value === 0 ? "" : value}
+                    placeholder={type === "number" ? "Enter amount" : undefined}
+                    onFocus={type === "number" ? (e) => e.target.select() : undefined}
+                    onChange={handleChange}
+                />
+            )}
+        </div>
+    );
+});
 
 function QuickAdd({ onSuccess }) {
     const [input, setInput] = useState("");
@@ -11,7 +158,16 @@ function QuickAdd({ onSuccess }) {
     const { createTransaction } = useTransactions();
     const { parseTransaction, loading: parsing } = useAI();
 
-    const handleParse = async (e) => {
+    const saveTransaction = useCallback(async (data) => {
+        try {
+            await createTransaction({ type: data.type, amount: data.amount, category: data.category, description: data.description, date: data.date });
+            if (onSuccess) onSuccess();
+        } catch {
+            // Error handled by hook
+        }
+    }, [createTransaction, onSuccess]);
+
+    const handleParse = useCallback(async (e) => {
         e.preventDefault();
         if (input.trim().length < 10) {
             return toast.error("Please describe the transaction in a few words (e.g. 'Spent 2k on food')");
@@ -19,129 +175,85 @@ function QuickAdd({ onSuccess }) {
         const data = await parseTransaction(input);
         if (!data) return;
 
-        const hasAmount      = data.amount > 0;
-        const noMissing      = !data.missingFields || data.missingFields.length === 0;
-        const isConfident    = data.confidence === "high" || data.confidence === "medium";
-
-        if (isConfident && hasAmount && noMissing) {
-            // All fields resolved cleanly — save instantly, no confirm screen
+        const isConfident = data.confidence === "high" || data.confidence === "medium";
+        if (isConfident && data.amount > 0 && (!data.missingFields || data.missingFields.length === 0)) {
             await saveTransaction(data);
             setInput("");
         } else {
-            // Low confidence, zero amount, or missing fields — let user review
             setParsed(data);
         }
-    };
+    }, [input, parseTransaction, saveTransaction, toast]);
 
-    const saveTransaction = async (data) => {
-        try {
-            await createTransaction({
-                type: data.type,
-                amount: data.amount,
-                category: data.category,
-                description: data.description,
-                date: data.date,
-            });
-            if (onSuccess) onSuccess();
-        } catch(err) {
-            // Error handled by hook
-        }
-    };
-
-    const handleConfirm = async () => {
-        if (!parsed.amount || parsed.amount <= 0) {
-            return toast.error("Please enter a valid amount");
-        }
+    const handleConfirm = useCallback(async () => {
+        if (!parsed?.amount || parsed.amount <= 0) return toast.error("Please enter a valid amount");
         await saveTransaction(parsed);
         setInput("");
         setParsed(null);
-    };
+    }, [parsed, saveTransaction, toast]);
 
-    const handleEdit = (field, value) => setParsed({ ...parsed, [field]: value });
-    const handleCancel = () => setParsed(null);
+    const handleEdit = useCallback((field, value) => {
+        setParsed(prev => prev ? { ...prev, [field]: value } : null);
+    }, []);
 
-    const examples = ["Spent 2k on lunch today", "Got paid 10k for salary"];
+    const handleChangeInput = useCallback((e) => setInput(e.target.value), []);
 
     return (
-        <div style={styles.card}>
-            <div style={styles.header}>
+        <div style={S.card}>
+            <div style={S.header}>
                 <div>
-                    <h3 style={styles.title}>Quick Add with AI</h3>
-                    <p style={styles.subtitle}>Type naturally — we'll parse the rest</p>
+                    <h3 style={S.title}>Quick Add with AI</h3>
+                    <p style={S.subtitle}>Type naturally, we'll understand your request</p>
                 </div>
             </div>
 
-            <form onSubmit={handleParse} style={styles.form}>
+            <form onSubmit={handleParse} style={S.form}>
                 <input
-                    style={styles.input}
+                    style={S.input}
                     type="text"
                     placeholder='e.g., "Spent 1k on food today"'
                     value={input}
-                    onChange={(e) => setInput(e.target.value)}
+                    onChange={handleChangeInput}
                     disabled={parsing}
                 />
-                <button style={styles.btn} type="submit" disabled={parsing}>
+                <button style={S.btn} type="submit" disabled={parsing}>
                     {parsing ? "Parsing..." : "Add"}
                 </button>
             </form>
 
             {!parsed && (
-                <div style={styles.examples}>
-                    <span style={styles.examplesLabel}>Try:</span>
-                    {examples.map((ex, i) => (
-                        <button key={i} style={styles.exampleChip} onClick={() => setInput(ex)}>
-                            {ex}
-                        </button>
+                <div style={S.examples}>
+                    <span style={S.examplesLabel}>Try:</span>
+                    {EXAMPLES.map((ex, i) => (
+                        <ExampleChip key={i} text={ex} onClick={setInput} />
                     ))}
                 </div>
             )}
 
             {parsed && (
-                <div style={styles.review}>
-                    <div style={styles.reviewHeader}>
-                        <span style={{ ...styles.confidenceBadge, ...getConfidenceStyle(parsed.confidence) }}>
+                <div style={S.review}>
+                    <div style={S.reviewHeader}>
+                        <span style={CONFIDENCE_STYLES[parsed.confidence] || CONFIDENCE_STYLES.low}>
                             {parsed.confidence === "low" ? "Low confidence — please verify" : "Please confirm"}
                         </span>
                         {parsed.missingFields?.length > 0 && (
-                            <p style={styles.missing}>Missing: {parsed.missingFields.join(", ")}</p>
+                            <p style={S.missing}>Missing: {parsed.missingFields.join(", ")}</p>
                         )}
                     </div>
 
-                    <div style={styles.reviewFields}>
-                        {[
-                            { label: "Type", field: "type", type: "select", options: ["expense", "income"] },
-                            { label: "Amount (₦)", field: "amount", type: "number" },
-                            { label: "Category", field: "category", type: "text" },
-                            { label: "Description", field: "description", type: "text" },
-                            { label: "Date", field: "date", type: "date" },
-                        ].map(({ label, field, type, options }) => (
-                            <div key={field} style={styles.field}>
-                                <label style={styles.label}>{label}</label>
-                                {type === "select" ? (
-                                    <select
-                                        style={styles.fieldInput}
-                                        value={parsed[field]}
-                                        onChange={(e) => handleEdit(field, e.target.value)}
-                                    >
-                                        {options.map(o => <option key={o} value={o}>{o}</option>)}
-                                    </select>
-                                ) : (
-                                    <input
-                                        style={styles.fieldInput}
-                                        type={type}
-                                        value={field === "amount" && parsed[field] === 0 ? "" : parsed[field]}
-                                        placeholder={field === "amount" ? "Enter amount" : undefined}
-                                        onFocus={field === "amount" ? (e) => e.target.select() : undefined}
-                                        onChange={(e) => handleEdit(field, type === "number" ? parseFloat(e.target.value) || 0 : e.target.value)}
-                                    />
-                                )}
-                            </div>
+                    <div style={S.reviewFields}>
+                        {REVIEW_FIELDS.map((fieldData) => (
+                            <ParsedField
+                                key={fieldData.field}
+                                {...fieldData}
+                                value={parsed[fieldData.field]}
+                                onChange={handleEdit}
+                            />
                         ))}
                     </div>
 
-                    <div style={styles.actions}>
-                        <button style={styles.btnCancel} onClick={handleCancel}>Cancel</button>
-                        <button style={styles.btnConfirm} onClick={handleConfirm}>Confirm & Save</button>
+                    <div style={S.actions}>
+                        <button style={S.btnCancel} onClick={() => setParsed(null)}>Cancel</button>
+                        <button style={S.btnConfirm} onClick={handleConfirm}>Confirm & Save</button>
                     </div>
                 </div>
             )}
@@ -149,123 +261,5 @@ function QuickAdd({ onSuccess }) {
     );
 }
 
-const getConfidenceStyle = (confidence) => {
-    if (confidence === "high")   return { background: "rgba(16,185,129,0.15)", color: "#34d399" };
-    if (confidence === "medium") return { background: "rgba(245,158,11,0.15)", color: "#fbbf24" };
-    return { background: "rgba(244,63,94,0.15)", color: "#fb7185" };
-};
-
-const styles = {
-    card: {
-        background: "#1e293b",
-        borderRadius: "clamp(12px, 2vw, 16px)",
-        padding: "clamp(1rem, 3vw, 1.5rem)",
-        border: "1px solid #334155",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
-    },
-    header: { marginBottom: "1.25rem" },
-    title: { fontSize: 15, fontWeight: 600, color: "#f1f5f9", margin: 0 },
-    subtitle: { fontSize: 12, color: "#64748b", margin: "3px 0 0" },
-    form: { display: "flex", gap: "0.5rem", marginBottom: "0.875rem" },
-    input: {
-        flex: 1,
-        padding: "11px 14px",
-        fontSize: 14,
-        border: "1.5px solid #334155",
-        borderRadius: 12,
-        background: "#334155",
-        color: "#f1f5f9",
-        outline: "none",
-        fontFamily: "inherit",
-    },
-    btn: {
-        padding: "11px 24px",
-        fontSize: 14,
-        fontWeight: 600,
-        background: "#6366f1",
-        color: "#fff",
-        border: "none",
-        borderRadius: 12,
-        cursor: "pointer",
-        minWidth: 80,
-        fontFamily: "inherit",
-    },
-    examples: { display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" },
-    examplesLabel: { fontSize: 12, color: "#64748b" },
-    exampleChip: {
-        fontSize: 12,
-        padding: "5px 11px",
-        background: "rgba(99,102,241,0.1)",
-        border: "1px solid rgba(99,102,241,0.2)",
-        color: "#818cf8",
-        borderRadius: 20,
-        cursor: "pointer",
-        fontFamily: "inherit",
-    },
-    review: {
-        marginTop: "1rem",
-        padding: "1.25rem",
-        background: "#0f172a",
-        borderRadius: 12,
-        border: "1px solid #334155",
-    },
-    reviewHeader: { marginBottom: "1rem" },
-    confidenceBadge: {
-        display: "inline-block",
-        fontSize: 11,
-        fontWeight: 600,
-        padding: "4px 10px",
-        borderRadius: 20,
-    },
-    missing: { fontSize: 12, color: "#64748b", margin: "8px 0 0" },
-    reviewFields: {
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-        gap: "0.75rem",
-        marginBottom: "1rem",
-    },
-    field: { display: "flex", flexDirection: "column" },
-    label: {
-        fontSize: 11,
-        fontWeight: 600,
-        color: "#64748b",
-        marginBottom: 4,
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
-    },
-    fieldInput: {
-        padding: "9px 12px",
-        fontSize: 13,
-        border: "1.5px solid #334155",
-        borderRadius: 10,
-        outline: "none",
-        background: "#1e293b",
-        color: "#f1f5f9",
-        fontFamily: "inherit",
-    },
-    actions: { display: "flex", gap: "0.5rem", justifyContent: "flex-end" },
-    btnCancel: {
-        padding: "9px 18px",
-        fontSize: 13,
-        fontWeight: 500,
-        background: "transparent",
-        color: "#94a3b8",
-        border: "1px solid #334155",
-        borderRadius: 10,
-        cursor: "pointer",
-        fontFamily: "inherit",
-    },
-    btnConfirm: {
-        padding: "9px 18px",
-        fontSize: 13,
-        fontWeight: 600,
-        background: "#6366f1",
-        color: "#fff",
-        border: "none",
-        borderRadius: 10,
-        cursor: "pointer",
-        fontFamily: "inherit",
-    },
-};
-
 export default memo(QuickAdd);
+

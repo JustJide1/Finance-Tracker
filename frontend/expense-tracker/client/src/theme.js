@@ -1,50 +1,70 @@
+// ─────────────────────────────────────────────────────────────────────────────
+//  Design Token System — Green Finance Theme
+//  Usage rule: always reference a token, never a raw hex value in components.
+// ─────────────────────────────────────────────────────────────────────────────
+
 export const C = {
-    bg:           "#0f172a",
-    surface:      "#1e293b",
-    elevated:     "#334155",
-    border:       "#334155",
-    borderFocus:  "#6366f1",
+    // ── Canvas / backgrounds ──────────────────────────────────────────────────
+    canvas:       "#EFEFEF",          // App outer background
+    surface:      "#FFFFFF",          // Card / panel backgrounds
+    surfaceAlt:   "#F5F5F5",          // Slightly-off-white for nested elements / inputs
+    border:       "#D1D5DB",          // Subtle borders between elements
+    borderFocus:  "#2D6A4F",          // Focus ring — primary accent dark
 
-    accent:       "#6366f1",
-    accentHover:  "#818cf8",
-    accentDark:   "#4f46e5",
-    accentMuted:  "rgba(99,102,241,0.15)",
+    // ── Primary accent (hero, CTA, active states) ────────────────────────────
+    accent:       "#2D6A4F",          // Primary action buttons, active nav indicator
+    accentDark:   "#1A4731",          // Hero card gradient start
+    accentHover:  "#1A4731",          // Hover state for primary buttons
+    accentLight:  "#C8E6C2",          // Light tint: chart fills, bar highlights
+    accentMid:    "#A8D5A2",          // Mid-light: sparklines, secondary chart fills
 
-    income:       "#10b981",
-    incomeSubtle: "rgba(16,185,129,0.12)",
-    expense:      "#f43f5e",
-    expenseSubtle:"rgba(244,63,94,0.12)",
-    warning:      "#f59e0b",
-    warningSubtle:"rgba(245,158,11,0.12)",
+    // ── Semantic transaction colours (kept for income / expense distinction) ──
+    income:        "#2D6A4F",         // Positive amounts  → use accent
+    incomeSubtle:  "rgba(45,106,79,0.10)",
+    expense:       "#DC2626",         // Negative amounts  → vivid red on light bg
+    expenseSubtle: "rgba(220,38,38,0.08)",
+    warning:       "#D97706",         // Budget warnings
+    warningSubtle: "rgba(217,119,6,0.10)",
 
-    textPrimary:  "#f1f5f9",
-    textSecondary:"#94a3b8",
-    textMuted:    "#64748b",
-    white:        "#ffffff",
+    // ── Text ─────────────────────────────────────────────────────────────────
+    textPrimary:   "#111111",         // Page titles, stat values (≥7:1 on #EFEFEF)
+    textSecondary: "#6B7280",         // Labels, meta, inactive nav  (≥4.5:1 on #FFFFFF)
+    textMuted:     "#9CA3AF",         // Placeholders, hints
+    textOnDark:    "#FFFFFF",         // Text that sits on the dark hero/accent bg
 
+    // ── Positive badge ────────────────────────────────────────────────────────
+    badgePosText:  "#065F46",         // "+15.76%" pill text
+    badgePosBg:    "#D1FAE5",         // "+15.76%" pill background
+
+    // ── Chart grid ────────────────────────────────────────────────────────────
+    chartGrid:     "#E5E7EB",         // Horizontal grid lines
+
+    // ── Hero gradient (StatCards primary card) ────────────────────────────────
     grad: {
-        accent:  "linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)",
-        income:  "linear-gradient(135deg, #10b981 0%, #059669 100%)",
-        expense: "linear-gradient(135deg, #f43f5e 0%, #e11d48 100%)",
-        warning: "linear-gradient(135deg, #f59e0b 0%, #d97706 100%)",
+        hero:    "linear-gradient(135deg, #1A4731 0%, #2D6A4F 100%)",
+        income:  "linear-gradient(135deg, #2D6A4F 0%, #1A4731 100%)",
+        expense: "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)",
+        warning: "linear-gradient(135deg, #D97706 0%, #B45309 100%)",
     },
 };
 
+// ── Shared card shell ─────────────────────────────────────────────────────────
 export const card = {
     background:   C.surface,
     borderRadius: "clamp(12px, 2vw, 16px)",
     padding:      "clamp(16px, 3vw, 24px)",
     border:       `1px solid ${C.border}`,
-    boxShadow:    "0 1px 3px rgba(0,0,0,0.3)",
+    boxShadow:    "0 1px 4px rgba(0,0,0,0.07)",
 };
 
+// ── Shared input shell ────────────────────────────────────────────────────────
 export const input = {
     padding:      "11px 14px",
     fontSize:     14,
     border:       `1.5px solid ${C.border}`,
     borderRadius: 12,
     outline:      "none",
-    background:   C.elevated,
+    background:   C.surfaceAlt,
     color:        C.textPrimary,
     fontFamily:   "inherit",
 };

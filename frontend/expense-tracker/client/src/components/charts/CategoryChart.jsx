@@ -2,9 +2,8 @@ import { useState, useEffect, memo } from "react";
 import { PieChart, Pie, ResponsiveContainer, Tooltip, Legend } from "recharts";
 import { transactionService } from "../../api/transactionService";
 
-const COLORS = ["#6366f1", "#10b981", "#f59e0b", "#f43f5e", "#818cf8", "#34d399", "#fb923c"];
+const COLORS = ["#2D6A4F", "#A8D5A2", "#1A4731", "#4CAF50", "#80CBC4", "#66BB6A", "#D97706"];
 
-// Single pass over transactions — O(N)
 function buildChartData(transactions) {
     const totals = new Map();
     for (const t of transactions) {
@@ -23,36 +22,34 @@ function CategoryChart({ transactions: txProp }) {
     const [loading, setLoading] = useState(!txProp);
 
     useEffect(() => {
-        if (txProp) {
-            setData(buildChartData(txProp));
-            return;
-        }
+        if (txProp) { setData(buildChartData(txProp)); return; }
         transactionService.getTransactions()
             .then((tx) => setData(buildChartData(tx)))
             .catch(console.error)
             .finally(() => setLoading(false));
     }, [txProp]);
 
-    if (loading) return <div style={styles.placeholder}>Loading...</div>;
-    if (data.length === 0) return <div style={styles.placeholder}>No expenses yet</div>;
+    if (loading) return <div style={S.placeholder}>Loading...</div>;
+    if (data.length === 0) return <div style={S.placeholder}>No expenses yet</div>;
 
     return (
         <ResponsiveContainer width="100%" height={250}>
             <PieChart>
                 <Pie
                     data={data}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={85}
+                    cx="50%" cy="50%"
+                    innerRadius={55} outerRadius={85}
                     paddingAngle={3}
                     dataKey="value"
                 />
                 <Tooltip
                     formatter={(value) => `₦${value.toLocaleString()}`}
-                    contentStyle={{ borderRadius: 10, border: "1px solid #334155", background: "#1e293b", fontSize: 13, color: "#f1f5f9" }}
+                    contentStyle={{ borderRadius: 8, border: "none", background: "#1A3C2E", fontSize: 12, color: "#fff" }}
                 />
-                <Legend layout="vertical" verticalAlign="middle" align="right" wrapperStyle={{ fontSize: 12, color: "#94a3b8" }} />
+                <Legend
+                    layout="vertical" verticalAlign="middle" align="right"
+                    wrapperStyle={{ fontSize: 12, color: "#6B7280" }}
+                />
             </PieChart>
         </ResponsiveContainer>
     );
@@ -60,6 +57,6 @@ function CategoryChart({ transactions: txProp }) {
 
 export default memo(CategoryChart);
 
-const styles = {
-    placeholder: { textAlign: "center", padding: "3rem", color: "#64748b", fontSize: 13 },
+const S = {
+    placeholder: { textAlign: "center", padding: "3rem", color: "#9CA3AF", fontSize: 13 },
 };

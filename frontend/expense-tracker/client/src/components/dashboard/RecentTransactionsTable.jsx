@@ -29,7 +29,7 @@ export default function RecentTransactionsTable({ transactions, onRefresh }) {
                                     <td style={styles.td}>{new Date(t.date).toLocaleDateString()}</td>
                                     <td style={{
                                         ...styles.td,
-                                        color: t.type === "expense" ? "#f43f5e" : "#10b981",
+                                        color: t.type === "expense" ? "#DC2626" : "#2D6A4F", /* expense red | income green */
                                         fontWeight: 600,
                                     }}>
                                         {t.type === "expense" ? "-" : "+"}₦{t.amount.toLocaleString()}
@@ -46,51 +46,51 @@ export default function RecentTransactionsTable({ transactions, onRefresh }) {
 
 const styles = {
     tableCard: {
-        background: "#1e293b",
+        background: "#FFFFFF",             /* --color-surface */
         borderRadius: "clamp(12px, 2vw, 16px)",
         overflow: "hidden",
-        border: "1px solid #334155",
-        boxShadow: "0 1px 3px rgba(0,0,0,0.3)",
+        border: "1px solid #D1D5DB",       /* --color-border */
+        boxShadow: "0 1px 4px rgba(0,0,0,0.07)",
     },
     tableCardHeader: {
         display: "flex",
         justifyContent: "space-between",
         alignItems: "center",
         padding: "clamp(1rem, 3vw, 1.5rem)",
-        borderBottom: "1px solid #334155",
+        borderBottom: "1px solid #E5E7EB", /* chart-grid / divider */
         gap: "1rem",
         flexWrap: "wrap",
     },
-    cardTitle: { fontSize: "clamp(13px, 3vw, 15px)", fontWeight: 600, color: "#f1f5f9", margin: 0 },
-    empty: { fontSize: 14, color: "#64748b", textAlign: "center", padding: "2rem" },
+    cardTitle: { fontSize: "clamp(13px, 3vw, 15px)", fontWeight: 600, color: "#111111", margin: 0 },
+    empty: { fontSize: 14, color: "#6B7280", textAlign: "center", padding: "2rem" },
     tableWrapper: { overflowX: "auto" },
     table: { width: "100%", borderCollapse: "collapse", minWidth: 500 },
     th: {
         padding: "clamp(10px, 2vw, 12px) clamp(12px, 3vw, 24px)",
         fontSize: "clamp(10px, 2vw, 11px)",
         fontWeight: 600,
-        color: "#64748b",
+        color: "#6B7280",               /* text-secondary */
         textAlign: "left",
-        background: "#334155",
+        background: "#F5F5F5",          /* surfaceAlt */
         textTransform: "uppercase",
         letterSpacing: "0.05em",
         whiteSpace: "nowrap",
     },
-    tr: { borderTop: "1px solid #334155" },
+    tr: { borderTop: "1px solid #E5E7EB" }, /* chart-grid */
     td: {
         padding: "clamp(12px, 2.5vw, 14px) clamp(12px, 3vw, 24px)",
         fontSize: "clamp(12px, 2.5vw, 14px)",
-        color: "#94a3b8",
+        color: "#374151",               /* slightly darker than text-secondary for readability */
         whiteSpace: "nowrap",
     },
     refreshBtn: {
         fontSize: 13,
         fontWeight: 600,
-        color: "#818cf8",
-        background: "rgba(99,102,241,0.12)",
+        color: "#2D6A4F",               /* accent */
+        background: "rgba(45,106,79,0.08)",
         padding: "7px 14px",
         borderRadius: 8,
-        border: "1px solid rgba(99,102,241,0.3)",
+        border: "1px solid rgba(45,106,79,0.25)",
         cursor: "pointer",
         whiteSpace: "nowrap",
     },

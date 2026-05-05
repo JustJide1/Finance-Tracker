@@ -20,5 +20,13 @@ export const transactionService = {
     deleteTransaction: async (id) => {
         const response = await axios.delete(`/transactions/${id}`);
         return response.data;
+    },
+    deleteAllExpenses: async () => {
+        const response = await axios.delete('/transactions/expenses/all');
+        return response.data;
+    },
+    deleteAllIncome: async () => {
+        const response = await axios.delete('/transactions/income/all');
+        return response.data;
     }
 };

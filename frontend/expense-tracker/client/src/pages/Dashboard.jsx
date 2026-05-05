@@ -10,9 +10,14 @@ export default function Dashboard() {
     const { user } = useAuthStore();
 
     const tabTitles = {
-        dashboard: `Hi, ${user?.firstName ?? ""}`,
-        income:    "Income",
-        expenses:  "Expenses",
+        dashboard: user?.firstName ? `Hi, ${user.firstName}` : "Dashboard",
+        income:    "Balance",
+        expenses:  "Transactions",
+    };
+
+    const tabSubtitles = {
+        income:    "Your income entries",
+        expenses:  "Your expense history",
     };
 
     const renderView = () => {
@@ -28,7 +33,7 @@ export default function Dashboard() {
             activeTab={activeTab}
             onNavClick={setActiveTab}
             title={tabTitles[activeTab] ?? tabTitles.dashboard}
-            subtitle="Track all your expenses"
+            subtitle={tabSubtitles[activeTab]}
             headerRight={<ExportButton />}
         >
             {renderView()}
