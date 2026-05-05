@@ -112,6 +112,32 @@ exports.deleteTransaction = async (req, res) => {
     }
 };
 
+// Delete ALL expense transactions for the logged-in user
+exports.deleteAllExpenses = async (req, res) => {
+    try {
+        const result = await Transaction.deleteMany({
+            userId: req.user.id,
+            type: "expense",
+        });
+        res.json({ message: "All expenses deleted", deletedCount: result.deletedCount });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+// Delete ALL income transactions for the logged-in user
+exports.deleteAllIncome = async (req, res) => {
+    try {
+        const result = await Transaction.deleteMany({
+            userId: req.user.id,
+            type: "income",
+        });
+        res.json({ message: "All income deleted", deletedCount: result.deletedCount });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
 // Get summary stats
 exports.getStats = async (req, res) => {
     try {
