@@ -24,6 +24,7 @@ export default function TransactionPage({ type }) {
     const [editingId, setEditingId] = useState(null);
     const [filteredTransactions, setFilteredTransactions] = useState([]);
     const [showClearDialog, setShowClearDialog] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
     const toast = useToast();
 
     const { transactions: allTransactions, loading: loadingTx, fetchTransactions, createTransaction, updateTransaction, deleteTransaction, deleteAllExpenses, deleteAllIncome } = useTransactions(type);
@@ -78,8 +79,11 @@ export default function TransactionPage({ type }) {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm(isExpense ? "Delete this expense?" : "Delete this income entry?")) return;
+    const handleDelete = (id) => setPendingDeleteId(id);
+
+    const confirmDelete = async () => {
+        const id = pendingDeleteId;
+        setPendingDeleteId(null);
         try { await deleteTransaction(id); } catch { /* handled */ }
     };
 
@@ -97,18 +101,32 @@ export default function TransactionPage({ type }) {
 
     return (
         <div style={S.wrapper}>
-            {/* Confirmation dialog */}
             {showClearDialog && (
                 <div style={S.overlay}>
-                    <div style={S.dialog}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="clear-tx-title" style={S.dialog}>
                         <div style={S.dialogIcon}>🗑️</div>
-                        <h4 style={S.dialogTitle}>Clear all {isExpense ? "expenses" : "income"}?</h4>
+                        <h4 id="clear-tx-title" style={S.dialogTitle}>Clear all {isExpense ? "expenses" : "income"}?</h4>
                         <p style={S.dialogMsg}>
                             Are you sure? <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong>
                         </p>
                         <div style={S.dialogBtns}>
                             <button style={S.btnDialogCancel} onClick={() => setShowClearDialog(false)}>Cancel</button>
                             <button style={S.btnDialogDelete} onClick={handleClearAll}>Delete all</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {pendingDeleteId && (
+                <div style={S.overlay}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="del-tx-title" style={S.dialog}>
+                        <div style={S.dialogIcon}>🗑️</div>
+                        <h4 id="del-tx-title" style={S.dialogTitle}>Delete {isExpense ? "expense" : "income entry"}?</h4>
+                        <p style={S.dialogMsg}>
+                            This entry will be permanently removed. <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong>
+                        </p>
+                        <div style={S.dialogBtns}>
+                            <button style={S.btnDialogCancel} onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                            <button style={S.btnDialogDelete} onClick={confirmDelete}>Delete</button>
                         </div>
                     </div>
                 </div>

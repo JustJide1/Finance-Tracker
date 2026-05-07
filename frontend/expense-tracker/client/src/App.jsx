@@ -5,6 +5,7 @@ import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
 import Budgets from "./pages/Budget";
 import Recurring from "./pages/Recurring";
+import Reports from "./pages/Reports";
 import PrivateRoute from "./components/privateRoute";
 
 
@@ -26,6 +27,7 @@ export default function App() {
           <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
           <Route path="/budgets" element={<PrivateRoute><Budgets /></PrivateRoute>} />
           <Route path="/recurring" element={<PrivateRoute><Recurring /></PrivateRoute>} />
+          <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
         </Routes>
       </BrowserRouter>
     </ToastProvider >

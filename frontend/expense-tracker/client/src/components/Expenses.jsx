@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "../api/axios";
 import TransactionFilters from "./TransactionFilters";
 import { useToast } from "./Toast";
+import CATEGORIES from "../constants/categories";
 
 export default function Expenses() {
     const [form, setForm] = useState({ amount: "", category: "", description: "", date: "" });
@@ -11,6 +12,7 @@ export default function Expenses() {
     const [loading, setLoading] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
     const [showClearDialog, setShowClearDialog] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
     const toast = useToast();
 
     useEffect(() => { fetchExpenseTransactions(); }, []);
@@ -70,8 +72,11 @@ export default function Expenses() {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm("Delete this expense?")) return;
+    const handleDelete = (id) => setPendingDeleteId(id);
+
+    const confirmDelete = async () => {
+        const id = pendingDeleteId;
+        setPendingDeleteId(null);
         try { await axios.delete(`/transactions/${id}`); toast.success("Expense deleted"); fetchExpenseTransactions(); }
         catch { toast.error("Failed to delete"); }
     };
@@ -91,13 +96,26 @@ export default function Expenses() {
         <div style={S.wrapper}>
             {showClearDialog && (
                 <div style={S.overlay}>
-                    <div style={S.dialog}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="clear-exp-title" style={S.dialog}>
                         <div style={{ fontSize: 36, marginBottom: "0.75rem" }}>🗑️</div>
-                        <h4 style={S.dialogTitle}>Clear all expenses?</h4>
+                        <h4 id="clear-exp-title" style={S.dialogTitle}>Clear all expenses?</h4>
                         <p style={S.dialogMsg}>Are you sure? <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong></p>
                         <div style={S.dialogBtns}>
                             <button style={S.btnDialogCancel} onClick={() => setShowClearDialog(false)}>Cancel</button>
                             <button style={S.btnDialogDelete} onClick={handleClearAll}>Delete all</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            {pendingDeleteId && (
+                <div style={S.overlay}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="del-exp-title" style={S.dialog}>
+                        <div style={{ fontSize: 36, marginBottom: "0.75rem" }}>🗑️</div>
+                        <h4 id="del-exp-title" style={S.dialogTitle}>Delete expense?</h4>
+                        <p style={S.dialogMsg}>This entry will be permanently removed. <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong></p>
+                        <div style={S.dialogBtns}>
+                            <button style={S.btnDialogCancel} onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                            <button style={S.btnDialogDelete} onClick={confirmDelete}>Delete</button>
                         </div>
                     </div>
                 </div>
@@ -109,7 +127,10 @@ export default function Expenses() {
                     <input style={S.input} type="number" placeholder="Amount (e.g. 2000)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                     <input style={S.input} type="text"   placeholder="Description"        value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
                     <div style={S.catWrap}>
-                        <input style={{ ...S.input, paddingRight: 40 }} type="text" placeholder={suggesting ? "AI is categorising..." : "Category"} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} readOnly={suggesting} />
+                        <select style={{ ...S.input, paddingRight: 40 }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} disabled={suggesting}>
+                            <option value="">{suggesting ? "AI is categorising..." : "Category"}</option>
+                            {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
                         <button type="button" style={S.aiBtn} onClick={handleSuggestCategory} disabled={suggesting}>{suggesting ? "..." : "AI"}</button>
                     </div>
                     <input style={S.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />

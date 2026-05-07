@@ -2,13 +2,14 @@ import { useState, useCallback, memo } from "react";
 import { useTransactions } from "../hooks/useTransactions";
 import { useAI } from "../hooks/useAI";
 import { useToast } from "./Toast";
+import CATEGORIES from "../constants/categories";
 
 const EXAMPLES = ["Spent 2k on lunch today", "Got paid 10k for salary"];
 
 const REVIEW_FIELDS = [
     { label: "Type", field: "type", type: "select", options: ["expense", "income"] },
     { label: "Amount (₦)", field: "amount", type: "number" },
-    { label: "Category", field: "category", type: "text" },
+    { label: "Category", field: "category", type: "select", options: CATEGORIES },
     { label: "Description", field: "description", type: "text" },
     { label: "Date", field: "date", type: "date" },
 ];
@@ -129,16 +130,18 @@ const ParsedField = memo(({ field, label, type, options, value, onChange }) => {
         onChange(field, type === "number" ? parseFloat(e.target.value) || 0 : e.target.value);
     }, [field, type, onChange]);
 
+    const inputId = `quickadd-${field}`;
     return (
         <div style={S.field}>
-            <label style={S.label}>{label}</label>
+            <label style={S.label} htmlFor={inputId}>{label}</label>
             {type === "select" ? (
-                <select style={S.fieldInput} value={value} onChange={handleChange}>
+                <select style={S.fieldInput} id={inputId} value={value} onChange={handleChange}>
                     {options.map(o => <option key={o} value={o}>{o}</option>)}
                 </select>
             ) : (
                 <input
                     style={S.fieldInput}
+                    id={inputId}
                     type={type}
                     value={type === "number" && value === 0 ? "" : value}
                     placeholder={type === "number" ? "Enter amount" : undefined}
@@ -158,9 +161,18 @@ function QuickAdd({ onSuccess }) {
     const { createTransaction } = useTransactions();
     const { parseTransaction, loading: parsing } = useAI();
 
-    const saveTransaction = useCallback(async (data) => {
+    const saveTransaction = useCallback(async (data, aiMeta) => {
         try {
-            await createTransaction({ type: data.type, amount: data.amount, category: data.category, description: data.description, date: data.date });
+            await createTransaction({
+                type: data.type,
+                amount: data.amount,
+                category: data.category,
+                description: data.description,
+                date: data.date,
+                aiSuggestedCategory: aiMeta?.aiSuggestedCategory ?? null,
+                aiConfidence: aiMeta?.aiConfidence ?? null,
+                userOverrode: aiMeta?.userOverrode ?? false,
+            });
             if (onSuccess) onSuccess();
         } catch {
             // Error handled by hook
@@ -177,16 +189,20 @@ function QuickAdd({ onSuccess }) {
 
         const isConfident = data.confidence === "high" || data.confidence === "medium";
         if (isConfident && data.amount > 0 && (!data.missingFields || data.missingFields.length === 0)) {
-            await saveTransaction(data);
+            await saveTransaction(data, { aiSuggestedCategory: data.category, aiConfidence: data.confidence, userOverrode: false });
             setInput("");
         } else {
-            setParsed(data);
+            setParsed({ ...data, _aiCategory: data.category, _aiConfidence: data.confidence });
         }
     }, [input, parseTransaction, saveTransaction, toast]);
 
     const handleConfirm = useCallback(async () => {
         if (!parsed?.amount || parsed.amount <= 0) return toast.error("Please enter a valid amount");
-        await saveTransaction(parsed);
+        await saveTransaction(parsed, {
+            aiSuggestedCategory: parsed._aiCategory ?? null,
+            aiConfidence: parsed._aiConfidence ?? null,
+            userOverrode: parsed.category !== parsed._aiCategory,
+        });
         setInput("");
         setParsed(null);
     }, [parsed, saveTransaction, toast]);

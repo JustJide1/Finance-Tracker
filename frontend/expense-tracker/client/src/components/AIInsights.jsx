@@ -5,19 +5,38 @@ function AIInsights() {
     const [insights, setInsights] = useState([]);
     const [anomaly, setAnomaly] = useState(null);
     const [hasLoaded, setHasLoaded] = useState(false);
+    const [period, setPeriod] = useState("month");
     const { getInsights, loading } = useAI();
 
-    const handleFetch = async () => { setHasLoaded(true); await fetchAIData(); };
-    const fetchAIData = async () => {
-        const data = await getInsights();
+    const handleFetch = async () => { setHasLoaded(true); await fetchAIData(period); };
+    const fetchAIData = async (selectedPeriod = period) => {
+        const data = await getInsights(selectedPeriod);
         if (data) { setInsights(data.insights); setAnomaly(data.anomaly); }
     };
 
     return (
         <div style={S.card}>
             <div style={S.header}>
-                <h3 style={S.title}>AI Insights</h3>
-                <button style={S.refreshBtn} onClick={fetchAIData} disabled={loading} title="Refresh">
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h3 style={S.title}>AI Insights</h3>
+                    {hasLoaded && (
+                        <select 
+                            value={period} 
+                            onChange={(e) => {
+                                setPeriod(e.target.value);
+                                fetchAIData(e.target.value);
+                            }}
+                            style={S.periodSelect}
+                            disabled={loading}
+                        >
+                            <option value="week">This Week</option>
+                            <option value="month">This Month</option>
+                            <option value="year">This Year</option>
+                            <option value="all">All Time</option>
+                        </select>
+                    )}
+                </div>
+                <button style={S.refreshBtn} onClick={() => fetchAIData(period)} disabled={loading} title="Refresh">
                     {loading ? "..." : "↻"}
                 </button>
             </div>
@@ -68,6 +87,16 @@ const S = {
         borderBottom: "1px solid #E5E7EB",
     },
     title: { fontSize: "clamp(13px, 3vw, 15px)", fontWeight: 600, color: "#111111", margin: 0 },
+    periodSelect: {
+        padding: "4px 8px",
+        borderRadius: "6px",
+        border: "1px solid #E5E7EB",
+        fontSize: "12px",
+        color: "#4B5563",
+        background: "#F9FAFB",
+        cursor: "pointer",
+        outline: "none"
+    },
     refreshBtn: {
         background: "#F9FAFB",
         border: "1px solid #E5E7EB",

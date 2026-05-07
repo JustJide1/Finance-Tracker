@@ -23,8 +23,16 @@ export const useTransactions = (type) => {
     const createTransaction = async (payload) => {
         setLoading(true);
         try {
-            await transactionService.createTransaction(payload);
+            const data = await transactionService.createTransaction(payload);
             toast.success(type === 'expense' ? "Expense added" : type === 'income' ? "Income added" : "Transaction added");
+            if (data?.budgetAlert) {
+                const { level, message } = data.budgetAlert;
+                if (level === 'exceeded') {
+                    toast.error(message);
+                } else {
+                    toast.warning(message);
+                }
+            }
             await fetchTransactions();
         } catch (err) {
             toast.error(err.response?.data?.message || "Failed to save");

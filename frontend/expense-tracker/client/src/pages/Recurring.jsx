@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useRecurring } from "../hooks/useRecurring";
 import PageLayout from "../components/PageLayout";
 import { useToast } from "../components/Toast";
+import CATEGORIES from "../constants/categories";
 
 export default function Recurring() {
     const [form, setForm] = useState({
@@ -10,6 +11,7 @@ export default function Recurring() {
         frequency: "monthly", startDate: new Date().toISOString().split("T")[0], endDate: "",
     });
     const [editingId, setEditingId] = useState(null);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
     const toast = useToast();
     const navigate = useNavigate();
 
@@ -44,21 +46,18 @@ export default function Recurring() {
     };
 
     const handleToggle = async (id) => { try { await toggleRecurring(id); } catch { /* handled */ } };
-    const handleDelete = async (id) => {
-        if (!confirm("Delete this recurring rule?")) return;
+    const handleDelete = (id) => setPendingDeleteId(id);
+
+    const confirmDelete = async () => {
+        const id = pendingDeleteId;
+        setPendingDeleteId(null);
         try { await deleteRecurring(id); } catch { /* handled */ }
     };
-
-    const categoryOptions = [
-        "Food & Dining", "Transportation", "Shopping", "Entertainment",
-        "Bills & Utilities", "Healthcare", "Education", "Investment",
-        "Salary", "Business", "Gifts", "Other",
-    ];
 
     const fields = [
         { label: "Type",                field: "type",        type: "select", options: [{ v: "expense", l: "Expense" }, { v: "income", l: "Income" }] },
         { label: "Amount (₦)",          field: "amount",      type: "number", placeholder: "0.00" },
-        { label: "Category",            field: "category",    type: "select", options: categoryOptions.map(c => ({ v: c, l: c })), placeholder: "Select category" },
+        { label: "Category",            field: "category",    type: "select", options: CATEGORIES.map(c => ({ v: c, l: c })), placeholder: "Select category" },
         { label: "Description",         field: "description", type: "text",   placeholder: "e.g., Netflix subscription" },
         { label: "Frequency",           field: "frequency",   type: "select", options: [{ v: "daily", l: "Daily" }, { v: "weekly", l: "Weekly" }, { v: "monthly", l: "Monthly" }] },
         { label: "Start Date",          field: "startDate",   type: "date" },
@@ -66,6 +65,20 @@ export default function Recurring() {
     ];
 
     return (
+        <>
+        {pendingDeleteId && (
+            <div style={S.overlay}>
+                <div role="dialog" aria-modal="true" aria-labelledby="rec-del-title" style={S.dialog}>
+                    <div style={{ fontSize: 32, marginBottom: "0.75rem" }}>🗑️</div>
+                    <h4 id="rec-del-title" style={S.dialogTitle}>Delete recurring rule?</h4>
+                    <p style={S.dialogMsg}>This rule will stop running. <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong></p>
+                    <div style={S.dialogBtns}>
+                        <button style={S.btnDialogCancel} onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                        <button style={S.btnDialogDelete} onClick={confirmDelete}>Delete</button>
+                    </div>
+                </div>
+            </div>
+        )}
         <PageLayout
             activeTab="recurring"
             onNavClick={(tab) => { if (tab === "dashboard") navigate("/dashboard"); if (tab === "budgets") navigate("/budgets"); }}
@@ -78,14 +91,14 @@ export default function Recurring() {
                 <form onSubmit={handleSubmit} style={S.form}>
                     {fields.map(({ label, field, type, options, placeholder }) => (
                         <div key={field} style={S.field}>
-                            <label style={S.label}>{label}</label>
+                            <label style={S.label} htmlFor={`recurring-${field}`}>{label}</label>
                             {type === "select" ? (
-                                <select style={S.input} value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })}>
+                                <select style={S.input} id={`recurring-${field}`} value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })}>
                                     {placeholder && <option value="">{placeholder}</option>}
                                     {options.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
                                 </select>
                             ) : (
-                                <input style={S.input} type={type} placeholder={placeholder} value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} />
+                                <input style={S.input} id={`recurring-${field}`} type={type} placeholder={placeholder} value={form[field]} onChange={(e) => setForm({ ...form, [field]: e.target.value })} />
                             )}
                         </div>
                     ))}
@@ -137,6 +150,7 @@ export default function Recurring() {
                 )}
             </div>
         </PageLayout>
+        </>
     );
 }
 
@@ -168,4 +182,11 @@ const S = {
     btnResume: { background: "rgba(45,106,79,0.10)",  color: "#2D6A4F" },
     btnEdit: { fontSize: 11, padding: "4px 10px", background: "transparent", border: "1px solid #E5E7EB",               color: "#6B7280", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
     btnDel:  { fontSize: 11, padding: "4px 10px", background: "transparent", border: "1px solid rgba(220,38,38,0.25)", color: "#DC2626", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
+    overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" },
+    dialog: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 18, padding: "2rem 2.25rem", maxWidth: 380, width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.12)" },
+    dialogTitle: { fontSize: 16, fontWeight: 700, color: "#111111", margin: "0 0 0.5rem" },
+    dialogMsg: { fontSize: 13, color: "#6B7280", lineHeight: 1.6, margin: "0 0 1.5rem" },
+    dialogBtns: { display: "flex", gap: "0.75rem", justifyContent: "center" },
+    btnDialogCancel: { padding: "10px 22px", fontSize: 14, fontWeight: 500, background: "transparent", color: "#6B7280", border: "1px solid #E5E7EB", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
+    btnDialogDelete: { padding: "10px 22px", fontSize: 14, fontWeight: 600, background: "#DC2626", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
 };

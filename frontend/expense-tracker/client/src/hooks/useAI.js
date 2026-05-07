@@ -32,11 +32,11 @@ export const useAI = () => {
         }
     };
 
-    const getInsights = async () => {
+    const getInsights = async (period = 'month') => {
         setLoading(true);
         try {
             const [insightsRes, anomaliesRes] = await Promise.all([
-                aiService.getInsights(),
+                aiService.getInsights(period),
                 aiService.getAnomalies()
             ]);
             return {
@@ -51,10 +51,24 @@ export const useAI = () => {
         }
     };
 
+    const forecastSpending = async () => {
+        setLoading(true);
+        try {
+            const data = await aiService.forecastSpending();
+            return data;
+        } catch (err) {
+            console.error("Failed to load forecast", err);
+            return null;
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return {
         loading,
         suggestCategory,
         parseTransaction,
-        getInsights
+        getInsights,
+        forecastSpending
     };
 };

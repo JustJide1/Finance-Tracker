@@ -9,6 +9,7 @@ import {
 import { useDashboardData } from "../hooks/useDashboardData";
 import { useAI } from "../hooks/useAI";
 import QuickAdd from "./QuickAdd";
+import ForecastChart from "./charts/ForecastChart";
 
 /* ── Dark tooltip for all charts ─────────────────────────────────────────── */
 function DarkTooltip({ active, payload, label }) {
@@ -61,7 +62,7 @@ function processTransactions(txns) {
     const currentMonthKey = `${currentYear}-${currentMonth}`;
     const prevMonthDate = new Date(currentYear, currentMonth - 1, 1);
     const prevMonthKey = `${prevMonthDate.getFullYear()}-${prevMonthDate.getMonth()}`;
-    
+
     let thisMonthExpenses = 0;
     let lastMonthExpenses = 0;
     let lifetimeBalanceAtStartOfMonth = 0;
@@ -139,14 +140,14 @@ function processTransactions(txns) {
         }
 
         if (tDateStr && weeklyAmounts[tDateStr] !== undefined) {
-             weeklyAmounts[tDateStr] += amount;
+            weeklyAmounts[tDateStr] += amount;
         }
     }
 
     // 3. Final Formatting
     const yd = [...ydMap.values()];
     const sd = [...sdMap.values()];
-    
+
     const cd = [...catMap.entries()]
         .sort((a, b) => b[1] - a[1])
         .slice(0, 6)
@@ -167,6 +168,72 @@ function processTransactions(txns) {
 }
 
 
+
+/* ── Onboarding panel ────────────────────────────────────────────────────── */
+const ONBOARD_STEPS = [
+    {
+        n: 1,
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+        ),
+        title: "Add a Transaction",
+        desc: "Use Quick Add above or go to Income / Expenses to log your first entry.",
+    },
+    {
+        n: 2,
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <line x1="3" y1="9" x2="21" y2="9" />
+                <line x1="9" y1="21" x2="9" y2="9" />
+            </svg>
+        ),
+        title: "Set a Budget",
+        desc: "Head to the Budget page to cap your spending by category each month.",
+    },
+    {
+        n: 3,
+        icon: (
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5">
+                <path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 17l-6.2 4.3 2.4-7.4L2 9.4h7.6z" />
+            </svg>
+        ),
+        title: "Get AI Insights",
+        desc: "After a few transactions, your AI assistant will surface spending patterns and tips.",
+    },
+];
+
+function OnboardingPanel() {
+    return (
+        <div style={S.onboardWrap}>
+            <div style={S.onboardHeader}>
+                <p style={S.onboardTitle}>Welcome — let's get you started</p>
+                <p style={S.onboardSub}>Follow these 3 steps to make the most of your Finance Tracker.</p>
+            </div>
+            <div style={S.onboardSteps} className="ft-onboard-steps">
+                {ONBOARD_STEPS.map((item, idx) => (
+                    <div key={item.n} style={{ display: "contents" }}>
+                        <div style={S.onboardCard}>
+                            <div style={S.onboardBadge}>{item.n}</div>
+                            <div style={S.onboardIconWrap}>{item.icon}</div>
+                            <p style={S.onboardCardTitle}>{item.title}</p>
+                            <p style={S.onboardCardDesc}>{item.desc}</p>
+                        </div>
+                        {idx < ONBOARD_STEPS.length - 1 && (
+                            <div style={S.onboardConnector} aria-hidden="true">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2">
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
 
 /* ── Tiny icon helpers ───────────────────────────────────────────────────── */
 function ChevronDown() {
@@ -192,18 +259,31 @@ function CalIcon() {
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function DashboardHome() {
     const { stats, transactions, recentTransactions, loading, fetchData } = useDashboardData();
-    const { getInsights } = useAI();
+    const { getInsights, forecastSpending } = useAI();
     const [insightsData, setInsightsData] = useState(null);
     const [loadingInsights, setLoadingInsights] = useState(true);
+    const [forecastState, setForecastState] = useState({ data: null, insight: null });
+    const [loadingForecast, setLoadingForecast] = useState(true);
 
     useEffect(() => {
         let mounted = true;
         const fetchAi = async () => {
             setLoadingInsights(true);
-            const data = await getInsights();
+            setLoadingForecast(true);
+
+            const [data, forecastRes] = await Promise.all([
+                getInsights(),
+                forecastSpending()
+            ]);
+
             if (mounted) {
                 setInsightsData(data);
                 setLoadingInsights(false);
+
+                if (forecastRes) {
+                    setForecastState({ data: forecastRes.forecastData, insight: forecastRes.insight });
+                }
+                setLoadingForecast(false);
             }
         };
         if (!loading) fetchAi();
@@ -214,11 +294,11 @@ export default function DashboardHome() {
 
     const { yd, sd, cd, wd, sl, slInc, pct, balancePct } = useMemo(() => processTransactions(transactions), [transactions]);
 
-    const balance         = stats?.balance         ?? 0;
-    const totalExpenses   = stats?.totalExpenses   ?? 0;
-    const totalIncome     = stats?.totalIncome     ?? 0;
+    const balance = stats?.balance ?? 0;
+    const totalExpenses = stats?.totalExpenses ?? 0;
+    const totalIncome = stats?.totalIncome ?? 0;
     const monthlyExpenses = stats?.monthlyExpenses ?? 0;
-    const maxCat          = cd.length ? Math.max(...cd.map(d => d.amount)) : 1;
+    const maxCat = cd.length ? Math.max(...cd.map(d => d.amount)) : 1;
 
     const weeklyActivityTotal = wd.reduce((sum, item) => sum + item.total, 0);
     const activityStatText = (() => {
@@ -250,6 +330,9 @@ export default function DashboardHome() {
             {/* ── Quick Add (AI Parser) ── */}
             <QuickAdd onSuccess={fetchData} />
 
+            {/* ── Onboarding (first-time users only) ── */}
+            {!hasData && <OnboardingPanel />}
+
             {/* ── Row 1 ── */}
             <div style={S.row1} className="ft-row1">
 
@@ -272,8 +355,8 @@ export default function DashboardHome() {
                             <AreaChart data={sl} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                                 <defs>
                                     <linearGradient id="slGrad" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#90EE90" stopOpacity={0.45} />
-                                        <stop offset="95%" stopColor="#90EE90" stopOpacity={0}    />
+                                        <stop offset="5%" stopColor="#90EE90" stopOpacity={0.45} />
+                                        <stop offset="95%" stopColor="#90EE90" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <Area
@@ -297,8 +380,8 @@ export default function DashboardHome() {
                             <AreaChart data={slInc} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                                 <defs>
                                     <linearGradient id="slGradInc" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#93C5FD" stopOpacity={0.45} />
-                                        <stop offset="95%" stopColor="#93C5FD" stopOpacity={0}    />
+                                        <stop offset="5%" stopColor="#93C5FD" stopOpacity={0.45} />
+                                        <stop offset="95%" stopColor="#93C5FD" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <Area
@@ -328,8 +411,8 @@ export default function DashboardHome() {
                             <AreaChart data={sl} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                                 <defs>
                                     <linearGradient id="slGradExp" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%"  stopColor="#FCA5A5" stopOpacity={0.45} />
-                                        <stop offset="95%" stopColor="#FCA5A5" stopOpacity={0}    />
+                                        <stop offset="5%" stopColor="#FCA5A5" stopOpacity={0.45} />
+                                        <stop offset="95%" stopColor="#FCA5A5" stopOpacity={0} />
                                     </linearGradient>
                                 </defs>
                                 <Area
@@ -357,8 +440,8 @@ export default function DashboardHome() {
                                 axisLine={false} tickLine={false} width={52}
                             />
                             <Tooltip content={<DarkTooltip />} />
-                            <Line type="monotone" dataKey="income"   stroke="#A8D5A2" strokeWidth={2.5} dot={false} name="Income"   />
-                            <Line type="monotone" dataKey="expenses" stroke="#2D6A4F" strokeWidth={2}   dot={false} name="Expenses" strokeDasharray="5 3" />
+                            <Line type="monotone" dataKey="income" stroke="#A8D5A2" strokeWidth={2.5} dot={false} name="Income" />
+                            <Line type="monotone" dataKey="expenses" stroke="#2D6A4F" strokeWidth={2} dot={false} name="Expenses" strokeDasharray="5 3" />
                         </LineChart>
                     </ResponsiveContainer>
                     <div style={S.legend}>
@@ -388,12 +471,27 @@ export default function DashboardHome() {
                                 axisLine={false} tickLine={false} width={44}
                             />
                             <Tooltip content={<DarkTooltip />} />
-                            <Bar dataKey="income"   fill="#1A3C2E" radius={[4, 4, 0, 0]} name="Income"   maxBarSize={14} />
+                            <Bar dataKey="income" fill="#1A3C2E" radius={[4, 4, 0, 0]} name="Income" maxBarSize={14} />
                             <Bar dataKey="expenses" fill="#A8D5A2" radius={[4, 4, 0, 0]} name="Expenses" maxBarSize={14} />
                         </BarChart>
                     </ResponsiveContainer>
                 </div>
 
+                <div style={S.card}>
+                    <div style={S.cardHead}>
+                        <span style={S.cardTitle}>Expense Forecast</span>
+                    </div>
+                    {forecastState.insight && !loadingForecast && forecastState.data && forecastState.data.length > 0 && (
+                        <p style={{ fontSize: 12, color: "#D97706", background: "rgba(217,119,6,0.1)", padding: "6px 10px", borderRadius: 6, marginBottom: 12, lineHeight: 1.4 }}>
+                            {forecastState.insight}
+                        </p>
+                    )}
+                    <ForecastChart data={forecastState.data} loading={loadingForecast} />
+                </div>
+            </div>
+
+            {/* ── Row 3 ── */}
+            <div style={S.row3} className="ft-row3">
                 {/* AI Insights */}
                 <div style={S.card}>
                     <div style={S.cardHead}>
@@ -441,8 +539,8 @@ export default function DashboardHome() {
                         <AreaChart data={wd} margin={{ top: 5, right: 5, bottom: 0, left: 0 }}>
                             <defs>
                                 <linearGradient id="actGrad" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%"  stopColor="#A8D5A2" stopOpacity={0.45} />
-                                    <stop offset="95%" stopColor="#A8D5A2" stopOpacity={0}    />
+                                    <stop offset="5%" stopColor="#A8D5A2" stopOpacity={0.45} />
+                                    <stop offset="95%" stopColor="#A8D5A2" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <XAxis dataKey="day" tick={{ fontSize: 10, fill: "#9CA3AF" }} axisLine={false} tickLine={false} />
@@ -505,7 +603,8 @@ const S = {
     wrapper: { display: "flex", flexDirection: "column", gap: 14 },
 
     row1: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 14 },
-    row2: { display: "grid", gridTemplateColumns: "2fr 1fr 1.2fr", gap: 14 },
+    row2: { display: "grid", gridTemplateColumns: "2fr 1.5fr", gap: 14 },
+    row3: { display: "grid", gridTemplateColumns: "1.5fr 1fr", gap: 14 },
 
     card: {
         background: "#FFFFFF",
@@ -609,6 +708,83 @@ const S = {
         marginRight: -22,
     },
 
+    /* Onboarding panel */
+    onboardWrap: {
+        background: "#FFFFFF",
+        borderRadius: 14,
+        padding: "22px 24px 20px",
+        border: "1px solid #E5E7EB",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.06)",
+    },
+    onboardHeader: { marginBottom: 20 },
+    onboardTitle: {
+        fontSize: 16,
+        fontWeight: 700,
+        color: "#111827",
+        margin: "0 0 4px",
+    },
+    onboardSub: {
+        fontSize: 13,
+        color: "#6B7280",
+        margin: 0,
+    },
+    onboardSteps: {
+        display: "flex",
+        alignItems: "center",
+        gap: 0,
+    },
+    onboardCard: {
+        flex: 1,
+        background: "#F9FAFB",
+        borderRadius: 12,
+        padding: "16px 18px",
+        border: "1px solid #E5E7EB",
+        display: "flex",
+        flexDirection: "column",
+        gap: 8,
+    },
+    onboardBadge: {
+        width: 24,
+        height: 24,
+        borderRadius: "50%",
+        background: "#2D6A4F",
+        color: "#fff",
+        fontSize: 12,
+        fontWeight: 700,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+    },
+    onboardIconWrap: {
+        width: 38,
+        height: 38,
+        borderRadius: 10,
+        background: "rgba(45,106,79,0.08)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+    },
+    onboardCardTitle: {
+        fontSize: 13,
+        fontWeight: 700,
+        color: "#111827",
+        margin: 0,
+    },
+    onboardCardDesc: {
+        fontSize: 12,
+        color: "#6B7280",
+        lineHeight: 1.55,
+        margin: 0,
+    },
+    onboardConnector: {
+        flexShrink: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: "0 6px",
+    },
+
     refreshBtn: {
         fontSize: 12,
         fontWeight: 600,
@@ -647,11 +823,16 @@ if (typeof window !== "undefined") {
             @media (max-width: 1040px) {
                 .ft-row1 { grid-template-columns: 1fr !important; }
             }
+            @media (max-width: 640px) {
+                .ft-onboard-steps { flex-direction: column !important; }
+            }
             @media (max-width: 860px) {
-                .ft-row2 { grid-template-columns: 1fr 1fr !important; }
+                .ft-row2 { grid-template-columns: 1fr !important; }
+                .ft-row3 { grid-template-columns: 1fr !important; }
             }
             @media (max-width: 560px) {
                 .ft-row2 { grid-template-columns: 1fr !important; }
+                .ft-row3 { grid-template-columns: 1fr !important; }
             }
         `;
         document.head.appendChild(el);

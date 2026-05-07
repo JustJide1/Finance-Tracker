@@ -21,7 +21,8 @@ const MAIN_NAV = [
     { id: "balance",      label: "Income",       icon: I.balance,      tab: "income"     },
     { id: "transactions", label: "Expense",       icon: I.transactions, tab: "expenses"   },
     { id: "budgets",      label: "Budgets",      icon: I.categories,   route: "/budgets" },
-    { id: "recurring",    label: "Recurring Transactions", icon: I.schedule, route: "/recurring" },
+    { id: "recurring",    label: "Recurring Transactions", icon: I.schedule,    route: "/recurring" },
+    { id: "reports",      label: "Reports",                icon: I.dataReport,  route: "/reports"   },
 ];
 
 const BOTTOM_NAV = [

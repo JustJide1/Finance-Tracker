@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import axios from "../api/axios";
 import TransactionFilters from "./TransactionFilters";
 import { useToast } from "./Toast";
+import CATEGORIES from "../constants/categories";
 
 export default function Income() {
     const [form, setForm] = useState({ amount: "", category: "", description: "", date: "" });
@@ -10,6 +11,7 @@ export default function Income() {
     const [filteredTransactions, setFilteredTransactions] = useState([]);
     const [loading, setLoading] = useState(false);
     const [suggesting, setSuggesting] = useState(false);
+    const [pendingDeleteId, setPendingDeleteId] = useState(null);
     const toast = useToast();
 
     useEffect(() => { fetchIncomeTransactions(); }, []);
@@ -69,8 +71,11 @@ export default function Income() {
         window.scrollTo({ top: 0, behavior: "smooth" });
     };
 
-    const handleDelete = async (id) => {
-        if (!confirm("Delete this income entry?")) return;
+    const handleDelete = (id) => setPendingDeleteId(id);
+
+    const confirmDelete = async () => {
+        const id = pendingDeleteId;
+        setPendingDeleteId(null);
         try { await axios.delete(`/transactions/${id}`); toast.success("Income deleted"); fetchIncomeTransactions(); }
         catch { toast.error("Failed to delete"); }
     };
@@ -79,13 +84,29 @@ export default function Income() {
 
     return (
         <div style={S.wrapper}>
+            {pendingDeleteId && (
+                <div style={S.overlay}>
+                    <div role="dialog" aria-modal="true" aria-labelledby="del-inc-title" style={S.dialog}>
+                        <div style={{ fontSize: 36, marginBottom: "0.75rem" }}>🗑️</div>
+                        <h4 id="del-inc-title" style={S.dialogTitle}>Delete income entry?</h4>
+                        <p style={S.dialogMsg}>This entry will be permanently removed. <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong></p>
+                        <div style={S.dialogBtns}>
+                            <button style={S.btnDialogCancel} onClick={() => setPendingDeleteId(null)}>Cancel</button>
+                            <button style={S.btnDialogDelete} onClick={confirmDelete}>Delete</button>
+                        </div>
+                    </div>
+                </div>
+            )}
             <div style={S.card}>
                 <h3 style={S.cardTitle}>{editingId ? "Edit Income Entry" : "Add Income Entry"}</h3>
                 <form onSubmit={handleSubmit} style={S.form}>
                     <input style={S.input} type="number" placeholder="Amount (e.g. 50000)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
                     <input style={S.input} type="text"   placeholder="Description"          value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
                     <div style={S.catWrap}>
-                        <input style={{ ...S.input, paddingRight: 40 }} type="text" placeholder={suggesting ? "AI is categorising..." : "Category"} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} readOnly={suggesting} />
+                        <select style={{ ...S.input, paddingRight: 40 }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} disabled={suggesting}>
+                            <option value="">{suggesting ? "AI is categorising..." : "Category"}</option>
+                            {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                        </select>
                         <button type="button" style={S.aiBtn} onClick={handleSuggestCategory} disabled={suggesting}>{suggesting ? "..." : "AI"}</button>
                     </div>
                     <input style={S.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
@@ -157,4 +178,11 @@ const S = {
     itemActions: { display: "flex", gap: "0.375rem" },
     btnEdit:   { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid #E5E7EB",               color: "#6B7280", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
     btnDelete: { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid rgba(220,38,38,0.25)", color: "#DC2626", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
+    overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" },
+    dialog: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 18, padding: "2rem 2.25rem", maxWidth: 380, width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.12)" },
+    dialogTitle: { fontSize: 16, fontWeight: 700, color: "#111111", margin: "0 0 0.5rem" },
+    dialogMsg: { fontSize: 13, color: "#6B7280", lineHeight: 1.6, margin: "0 0 1.5rem" },
+    dialogBtns: { display: "flex", gap: "0.75rem", justifyContent: "center" },
+    btnDialogCancel: { padding: "10px 22px", fontSize: 14, fontWeight: 500, background: "transparent", color: "#6B7280", border: "1px solid #E5E7EB", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
+    btnDialogDelete: { padding: "10px 22px", fontSize: 14, fontWeight: 600, background: "#DC2626", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
 };

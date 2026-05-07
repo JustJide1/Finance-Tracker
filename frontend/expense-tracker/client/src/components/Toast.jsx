@@ -27,7 +27,7 @@ export function ToastProvider({ children }) {
     return (
         <ToastContext.Provider value={{ success, error, info, warning }}>
             {children}
-            <div style={styles.container}>
+            <div style={styles.container} role="status" aria-live="polite" aria-atomic="false">
                 {toasts.map((toast) => (
                     <div key={toast.id} style={{ ...styles.toast, ...styles[toast.type] }}>
                         <span style={{ ...styles.icon, ...iconStyles[toast.type] }}>{getIcon(toast.type)}</span>

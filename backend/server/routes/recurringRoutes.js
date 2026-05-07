@@ -8,12 +8,17 @@ const {
     deleteRecurring,
     toggleActive,
 } = require("../controllers/recurringController");
+const {
+    validate,
+    createRecurringValidators,
+    updateRecurringValidators,
+} = require("../middleware/validators");
 
 router.use(authMiddleware);
 
 router.get("/", getRecurring);
-router.post("/", createRecurring);
-router.put("/:id", updateRecurring);
+router.post("/", createRecurringValidators, validate, createRecurring);
+router.put("/:id", updateRecurringValidators, validate, updateRecurring);
 router.patch("/:id/toggle", toggleActive);
 router.delete("/:id", deleteRecurring);
 

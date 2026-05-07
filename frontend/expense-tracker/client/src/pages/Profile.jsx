@@ -9,6 +9,7 @@ export default function Profile() {
     const [profile, setProfile] = useState({ firstName: "", lastName: "", email: "" });
     const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
     const [deletePassword, setDeletePassword] = useState("");
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [loading, setLoading] = useState({ profile: false, password: false, delete: false });
     const [activeTab, setActiveTab] = useState("profile");
     const toast = useToast();
@@ -50,9 +51,13 @@ export default function Profile() {
         finally { setLoading(l => ({ ...l, password: false })); }
     };
 
-    const handleDeleteAccount = async () => {
+    const handleDeleteAccount = () => {
         if (!deletePassword) return toast.error("Enter your password to confirm");
-        if (!window.confirm("This will permanently delete your account and all data. This cannot be undone.")) return;
+        setShowDeleteConfirm(true);
+    };
+
+    const confirmDeleteAccount = async () => {
+        setShowDeleteConfirm(false);
         setLoading(l => ({ ...l, delete: true }));
         try {
             await authService.deleteAccount({ password: deletePassword });
@@ -70,6 +75,20 @@ export default function Profile() {
     ];
 
     return (
+        <>
+        {showDeleteConfirm && (
+            <div style={S.overlay}>
+                <div role="dialog" aria-modal="true" aria-labelledby="delete-dlg-title" style={S.dialog}>
+                    <div style={{ fontSize: 36, marginBottom: "0.75rem" }}>⚠️</div>
+                    <h4 id="delete-dlg-title" style={S.dialogTitle}>Delete your account?</h4>
+                    <p style={S.dialogMsg}>This will permanently delete your account and ALL transaction data. <strong style={{ color: "#DC2626" }}>This cannot be undone.</strong></p>
+                    <div style={S.dialogBtns}>
+                        <button style={S.btnDialogCancel} onClick={() => setShowDeleteConfirm(false)}>Cancel</button>
+                        <button style={S.btnDialogDelete} onClick={confirmDeleteAccount}>Delete my account</button>
+                    </div>
+                </div>
+            </div>
+        )}
         <PageLayout
             activeTab="settings"
             onNavClick={(tab) => { if (tab === "dashboard") navigate("/dashboard"); }}
@@ -95,17 +114,17 @@ export default function Profile() {
                     <form onSubmit={handleProfileUpdate}>
                         <div style={S.row}>
                             <div style={S.field}>
-                                <label style={S.label}>First Name</label>
-                                <input style={S.input} type="text" value={profile.firstName} onChange={(e) => setProfile({ ...profile, firstName: e.target.value })} />
+                                <label style={S.label} htmlFor="profile-firstName">First Name</label>
+                                <input style={S.input} id="profile-firstName" type="text" value={profile.firstName} onChange={(e) => setProfile({ ...profile, firstName: e.target.value })} />
                             </div>
                             <div style={S.field}>
-                                <label style={S.label}>Last Name</label>
-                                <input style={S.input} type="text" value={profile.lastName} onChange={(e) => setProfile({ ...profile, lastName: e.target.value })} />
+                                <label style={S.label} htmlFor="profile-lastName">Last Name</label>
+                                <input style={S.input} id="profile-lastName" type="text" value={profile.lastName} onChange={(e) => setProfile({ ...profile, lastName: e.target.value })} />
                             </div>
                         </div>
                         <div style={S.field}>
-                            <label style={S.label}>Email Address</label>
-                            <input style={S.input} type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
+                            <label style={S.label} htmlFor="profile-email">Email Address</label>
+                            <input style={S.input} id="profile-email" type="email" value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} />
                         </div>
                         <button style={S.btnPrimary} type="submit" disabled={loading.profile}>
                             {loading.profile ? "Saving..." : "Save Changes"}
@@ -124,8 +143,8 @@ export default function Profile() {
                             { label: "Confirm Password", key: "confirmPassword" },
                         ].map(({ label, key, placeholder }) => (
                             <div key={key} style={S.field}>
-                                <label style={S.label}>{label}</label>
-                                <input style={S.input} type="password" placeholder={placeholder} value={passwords[key]} onChange={(e) => setPasswords({ ...passwords, [key]: e.target.value })} />
+                                <label style={S.label} htmlFor={`profile-${key}`}>{label}</label>
+                                <input style={S.input} id={`profile-${key}`} type="password" placeholder={placeholder} value={passwords[key]} onChange={(e) => setPasswords({ ...passwords, [key]: e.target.value })} />
                             </div>
                         ))}
                         <button style={S.btnPrimary} type="submit" disabled={loading.password}>
@@ -142,8 +161,8 @@ export default function Profile() {
                         This will permanently delete your account and ALL transaction data. This cannot be undone.
                     </p>
                     <div style={S.field}>
-                        <label style={S.label}>Enter your password to confirm</label>
-                        <input style={S.input} type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
+                        <label style={S.label} htmlFor="profile-deletePassword">Enter your password to confirm</label>
+                        <input style={S.input} id="profile-deletePassword" type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} />
                     </div>
                     <button style={S.btnDanger} onClick={handleDeleteAccount} disabled={loading.delete}>
                         {loading.delete ? "Deleting..." : "Delete My Account"}
@@ -151,6 +170,7 @@ export default function Profile() {
                 </div>
             )}
         </PageLayout>
+        </>
     );
 }
 
@@ -179,4 +199,11 @@ const S = {
     btnPrimary: { padding: "11px 24px", fontSize: 14, fontWeight: 600, background: "linear-gradient(135deg, #1A4731 0%, #2D6A4F 100%)", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", marginTop: "0.5rem", fontFamily: "inherit" },
     btnDanger:  { padding: "11px 24px", fontSize: 14, fontWeight: 600, background: "#DC2626", color: "#fff", border: "none", borderRadius: 12, cursor: "pointer", marginTop: "0.5rem", fontFamily: "inherit" },
     warning: { fontSize: 13, color: "#DC2626", background: "rgba(220,38,38,0.05)", border: "1px solid rgba(220,38,38,0.15)", borderRadius: 10, padding: "12px 16px", marginBottom: "1.5rem", lineHeight: 1.5 },
+    overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" },
+    dialog: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 18, padding: "2rem 2.25rem", maxWidth: 400, width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.12)" },
+    dialogTitle: { fontSize: 16, fontWeight: 700, color: "#111111", margin: "0 0 0.5rem" },
+    dialogMsg: { fontSize: 13, color: "#6B7280", lineHeight: 1.6, margin: "0 0 1.5rem" },
+    dialogBtns: { display: "flex", gap: "0.75rem", justifyContent: "center" },
+    btnDialogCancel: { padding: "10px 22px", fontSize: 14, fontWeight: 500, background: "transparent", color: "#6B7280", border: "1px solid #E5E7EB", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
+    btnDialogDelete: { padding: "10px 22px", fontSize: 14, fontWeight: 600, background: "#DC2626", color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontFamily: "inherit" },
 };

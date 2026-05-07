@@ -7,12 +7,17 @@ const {
     updateBudget,
     deleteBudget,
 } = require("../controllers/budgetController");
+const {
+    validate,
+    createBudgetValidators,
+    updateBudgetValidators,
+} = require("../middleware/validators");
 
 router.use(authMiddleware);
 
 router.get("/", getBudgets);
-router.post("/", createBudget);
-router.put("/:id", updateBudget);
+router.post("/", createBudgetValidators, validate, createBudget);
+router.put("/:id", updateBudgetValidators, validate, updateBudget);
 router.delete("/:id", deleteBudget);
 
 module.exports = router;

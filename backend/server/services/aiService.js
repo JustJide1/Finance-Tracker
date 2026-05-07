@@ -1,4 +1,5 @@
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const CATEGORIES = require("../../../shared/categories");
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
@@ -6,20 +7,7 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 // Auto-categorize a transaction
 exports.categorizeTransaction = async (description) => {
     const prompt = `You are a financial assistant. Categorize this transaction into ONE of these categories:
-- Food & Dining
-- Transportation
-- Shopping
-- Entertainment
-- Bills & Utilities
-- Healthcare
-- Education
-- Investment
-- Salary
-- Business
-- Gifts
-- Family Support
-- Personal Care
-- Other
+${CATEGORIES.map(c => `- ${c}`).join("\n")}
 
 Transaction description: "${description}"
 
@@ -164,7 +152,7 @@ EXTRACTION RULES:
    - Always return as number (Naira equivalent)
 
 3. CATEGORY: Choose the BEST match from this list ONLY:
-   Food & Dining, Transportation, Shopping, Entertainment, Bills & Utilities, Healthcare, Education, Investment, Salary, Business, Gifts, Family Support, Personal Care, Other
+   ${CATEGORIES.join(", ")}
    - Family Support: money sent to family, supporting parents/siblings, remittance
    - Personal Care: haircut, salon, spa, grooming, skincare, cosmetics, barbing
 

@@ -18,6 +18,7 @@ const TransactionSchema = new mongoose.Schema({
     },
     category: {
         type: String,
+        enum: require("../../../shared/categories"),
         required: true,
         trim: true,
     },
@@ -29,6 +30,19 @@ const TransactionSchema = new mongoose.Schema({
     date: {
         type: Date,
         required: true,
+    },
+    aiSuggestedCategory: {
+        type: String,
+        default: null,
+    },
+    aiConfidence: {
+        type: String,
+        enum: ["high", "medium", "low"],
+        default: null,
+    },
+    userOverrode: {
+        type: Boolean,
+        default: false,
     },
 }, { timestamps: true });
 

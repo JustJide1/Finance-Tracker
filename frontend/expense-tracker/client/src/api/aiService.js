@@ -9,12 +9,20 @@ export const aiService = {
         const response = await axios.post('/ai/parse-transaction', { text });
         return response.data;
     },
-    getInsights: async () => {
-        const response = await axios.get('/ai/insights');
+    getInsights: async (period = 'month') => {
+        const response = await axios.get(`/ai/insights?period=${period}`);
         return response.data;
     },
     getAnomalies: async () => {
         const response = await axios.get('/ai/anomalies');
+        return response.data;
+    },
+    forecastSpending: async () => {
+        const response = await axios.get('/ai/forecast');
+        return response.data;
+    },
+    getCategoryAccuracy: async () => {
+        const response = await axios.get('/ai/accuracy');
         return response.data;
     }
 };

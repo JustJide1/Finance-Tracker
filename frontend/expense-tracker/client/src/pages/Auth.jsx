@@ -103,23 +103,23 @@ export default function Auth() {
                         {tab === "register" && (
                             <div style={S.nameRow}>
                                 <div style={S.field}>
-                                    <label style={S.label}>First name</label>
-                                    <input style={S.input} name="firstName" placeholder="John" value={form.firstName} onChange={handleChange} />
+                                    <label style={S.label} htmlFor="auth-firstName">First name</label>
+                                    <input style={S.input} id="auth-firstName" name="firstName" placeholder="John" value={form.firstName} onChange={handleChange} />
                                 </div>
                                 <div style={S.field}>
-                                    <label style={S.label}>Last name</label>
-                                    <input style={S.input} name="lastName" placeholder="Doe" value={form.lastName} onChange={handleChange} />
+                                    <label style={S.label} htmlFor="auth-lastName">Last name</label>
+                                    <input style={S.input} id="auth-lastName" name="lastName" placeholder="Doe" value={form.lastName} onChange={handleChange} />
                                 </div>
                             </div>
                         )}
 
                         <div style={S.field}>
-                            <label style={S.label}>Email address</label>
-                            <input style={S.input} name="email" type="email" placeholder="you@example.com" value={form.email} onChange={handleChange} />
+                            <label style={S.label} htmlFor="auth-email">Email address</label>
+                            <input style={S.input} id="auth-email" name="email" type="email" placeholder="you@example.com" value={form.email} onChange={handleChange} />
                         </div>
                         <div style={S.field}>
-                            <label style={S.label}>Password</label>
-                            <input style={S.input} name="password" type="password" placeholder="Min. 8 characters" value={form.password} onChange={handleChange} />
+                            <label style={S.label} htmlFor="auth-password">Password</label>
+                            <input style={S.input} id="auth-password" name="password" type="password" placeholder="Min. 8 characters" value={form.password} onChange={handleChange} />
                         </div>
 
                         <button style={{ ...S.btnPrimary, opacity: loading ? 0.75 : 1 }} onClick={handleSubmit} disabled={loading}>

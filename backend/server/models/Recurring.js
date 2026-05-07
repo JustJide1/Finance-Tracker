@@ -18,6 +18,7 @@ const RecurringSchema = new mongoose.Schema({
     },
     category: {
         type: String,
+        enum: require("../../../shared/categories"),
         required: true,
         trim: true,
     },

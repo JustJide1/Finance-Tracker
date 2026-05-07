@@ -50,19 +50,19 @@ export default function TransactionFilters({ onFilter, categories = [] }) {
             {expanded && (
                 <div style={S.filtersGrid}>
                     <div style={S.field}>
-                        <label style={S.label}>Category</label>
-                        <select style={S.input} value={filters.category} onChange={(e) => handleChange("category", e.target.value)}>
+                        <label style={S.label} htmlFor="filter-category">Category</label>
+                        <select style={S.input} id="filter-category" value={filters.category} onChange={(e) => handleChange("category", e.target.value)}>
                             <option value="">All categories</option>
                             {categories.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                     </div>
                     <div style={S.field}>
-                        <label style={S.label}>From</label>
-                        <input style={S.input} type="date" value={filters.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
+                        <label style={S.label} htmlFor="filter-startDate">From</label>
+                        <input style={S.input} id="filter-startDate" type="date" value={filters.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
                     </div>
                     <div style={S.field}>
-                        <label style={S.label}>To</label>
-                        <input style={S.input} type="date" value={filters.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
+                        <label style={S.label} htmlFor="filter-endDate">To</label>
+                        <input style={S.input} id="filter-endDate" type="date" value={filters.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
                     </div>
                 </div>
             )}
