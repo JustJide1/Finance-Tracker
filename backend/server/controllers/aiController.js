@@ -483,7 +483,6 @@ The statistical forecast for next month is ₦${predictedAmount.toLocaleString(u
 Write a single, encouraging, and practical 1-sentence financial insight or tip about this trend for the user. Do not mention the exact word "statistical forecast". Focus on actionable advice.`;
 
         try {
-            const { generateWithRetry } = require("./aiController"); // Already imported in scope, but actually it's just available as `generateWithRetry`.
             const result = await generateWithRetry(model, prompt);
             insight = result.response.text().trim();
         } catch (err) {
