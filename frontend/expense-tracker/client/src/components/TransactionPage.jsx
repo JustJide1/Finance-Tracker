@@ -8,16 +8,16 @@ export default function TransactionPage({ type }) {
     const isExpense = type === "expense";
 
     const cfg = {
-        addTitle:    isExpense ? "Log New Expense"    : "Add Income Entry",
-        editTitle:   isExpense ? "Edit Expense"        : "Edit Income Entry",
-        historyTitle:isExpense ? "Expense History"    : "Income History",
-        addBtn:      isExpense ? "Add Expense"         : "Add Income",
-        amountColor: isExpense ? "#DC2626"             : "#2D6A4F",
-        submitBg:    isExpense
+        addTitle: isExpense ? "Log New Expense" : "Add Income Entry",
+        editTitle: isExpense ? "Edit Expense" : "Edit Income Entry",
+        historyTitle: isExpense ? "Expense History" : "Income History",
+        addBtn: isExpense ? "Add Expense" : "Add Income",
+        amountColor: isExpense ? "#DC2626" : "#2D6A4F",
+        submitBg: isExpense
             ? "linear-gradient(135deg, #DC2626 0%, #B91C1C 100%)"
             : "linear-gradient(135deg, #1A4731 0%, #2D6A4F 100%)",
         editingBorder: isExpense ? "#DC2626" : "#2D6A4F",
-        editingBg:     isExpense ? "rgba(220,38,38,0.05)" : "rgba(45,106,79,0.06)",
+        editingBg: isExpense ? "rgba(220,38,38,0.05)" : "rgba(45,106,79,0.06)",
     };
 
     const [form, setForm] = useState({ amount: "", category: "", description: "", date: "" });
@@ -38,15 +38,15 @@ export default function TransactionPage({ type }) {
     );
 
     const handleFilter = (filters) => {
-        const term    = filters.search ? filters.search.toLowerCase() : null;
+        const term = filters.search ? filters.search.toLowerCase() : null;
         const startMs = filters.startDate ? new Date(filters.startDate).getTime() : null;
-        const endMs   = filters.endDate   ? new Date(filters.endDate).getTime()   : null;
+        const endMs = filters.endDate ? new Date(filters.endDate).getTime() : null;
 
         setFilteredTransactions(allTransactions.filter(t => {
             if (term && !t.description.toLowerCase().includes(term) && !t.category.toLowerCase().includes(term)) return false;
             if (filters.category && t.category !== filters.category) return false;
             if (startMs !== null && new Date(t.date).getTime() < startMs) return false;
-            if (endMs   !== null && new Date(t.date).getTime() > endMs)   return false;
+            if (endMs !== null && new Date(t.date).getTime() > endMs) return false;
             return true;
         }));
     };
@@ -65,7 +65,7 @@ export default function TransactionPage({ type }) {
         try {
             const payload = { type, amount: parseFloat(form.amount), category: form.category, description: form.description, date: form.date };
             if (editingId) await updateTransaction(editingId, payload);
-            else           await createTransaction(payload);
+            else await createTransaction(payload);
             resetForm();
         } catch {
             // handled by hook
@@ -118,13 +118,13 @@ export default function TransactionPage({ type }) {
             <div style={S.card}>
                 <h3 style={S.cardTitle}>{editingId ? cfg.editTitle : cfg.addTitle}</h3>
                 <form onSubmit={handleSubmit} style={S.form}>
-                    <input style={S.input} type="number"   placeholder="Amount"                     value={form.amount}      onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} />
-                    <input style={S.input} type="text"     placeholder="Description"                value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
+                    <input style={S.input} type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} />
+                    <input style={S.input} type="text" placeholder="Description" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
                     <div style={S.categoryWrapper}>
                         <input
                             style={{ ...S.input, paddingRight: 40 }}
                             type="text"
-                            placeholder={suggesting ? "AI is categorising..." : "Category (auto-filled by AI)"}
+                            placeholder={suggesting ? "AI is categorising..." : "Category"}
                             value={form.category}
                             onChange={(e) => setForm(f => ({ ...f, category: e.target.value }))}
                             readOnly={suggesting}
@@ -180,7 +180,7 @@ export default function TransactionPage({ type }) {
                                         ₦{t.amount.toLocaleString()}
                                     </div>
                                     <div style={S.itemActions}>
-                                        <button style={S.btnEdit}   onClick={() => handleEdit(t)}>Edit</button>
+                                        <button style={S.btnEdit} onClick={() => handleEdit(t)}>Edit</button>
                                         <button style={S.btnDelete} onClick={() => handleDelete(t._id)}>Delete</button>
                                     </div>
                                 </div>
@@ -258,7 +258,7 @@ const S = {
     itemRight: { display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "0.5rem" },
     itemAmount: { fontSize: 15, fontWeight: 700 },
     itemActions: { display: "flex", gap: "0.375rem" },
-    btnEdit:   { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid #E5E7EB",               color: "#6B7280", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
+    btnEdit: { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid #E5E7EB", color: "#6B7280", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
     btnDelete: { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid rgba(220,38,38,0.25)", color: "#DC2626", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
     overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" },
     dialog: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 18, padding: "2rem 2.25rem", maxWidth: 380, width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.12)" },

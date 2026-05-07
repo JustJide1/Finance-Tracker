@@ -64,6 +64,8 @@ function processTransactions(txns) {
     
     let thisMonthExpenses = 0;
     let lastMonthExpenses = 0;
+    let lifetimeBalanceAtStartOfMonth = 0;
+    let totalComputedBalance = 0;
     const catMap = new Map();
 
     const days = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -111,6 +113,13 @@ function processTransactions(txns) {
             else sBucket.expenses += amount;
         }
 
+        const diff = type === "income" ? amount : -amount;
+        totalComputedBalance += diff;
+        const startOfCurrentMonth = new Date(currentYear, currentMonth, 1);
+        if (d < startOfCurrentMonth) {
+            lifetimeBalanceAtStartOfMonth += diff;
+        }
+
         if (type === "expense") {
             if (tKey === currentMonthKey) {
                 thisMonthExpenses += amount;
@@ -152,8 +161,9 @@ function processTransactions(txns) {
     const slInc = sparklineMonths.map(k => ({ v: sparklineIncomeAmounts[k] }));
 
     const pct = lastMonthExpenses === 0 ? null : +((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(1);
+    const balancePct = lifetimeBalanceAtStartOfMonth === 0 ? null : +((totalComputedBalance - lifetimeBalanceAtStartOfMonth) / Math.abs(lifetimeBalanceAtStartOfMonth) * 100).toFixed(1);
 
-    return { yd, sd, cd, wd, sl, slInc, pct };
+    return { yd, sd, cd, wd, sl, slInc, pct, balancePct };
 }
 
 
@@ -202,13 +212,21 @@ export default function DashboardHome() {
 
     const hasData = transactions.length > 0;
 
-    const { yd, sd, cd, wd, sl, slInc, pct } = useMemo(() => processTransactions(transactions), [transactions]);
+    const { yd, sd, cd, wd, sl, slInc, pct, balancePct } = useMemo(() => processTransactions(transactions), [transactions]);
 
     const balance         = stats?.balance         ?? 0;
     const totalExpenses   = stats?.totalExpenses   ?? 0;
     const totalIncome     = stats?.totalIncome     ?? 0;
     const monthlyExpenses = stats?.monthlyExpenses ?? 0;
     const maxCat          = cd.length ? Math.max(...cd.map(d => d.amount)) : 1;
+
+    const weeklyActivityTotal = wd.reduce((sum, item) => sum + item.total, 0);
+    const activityStatText = (() => {
+        if (weeklyActivityTotal === 0) return "0";
+        if (weeklyActivityTotal >= 1000000) return `${(weeklyActivityTotal / 1000000).toFixed(1).replace(/\.0$/, '')}m`;
+        if (weeklyActivityTotal >= 1000) return `${(weeklyActivityTotal / 1000).toFixed(1).replace(/\.0$/, '')}k`;
+        return `${weeklyActivityTotal}`;
+    })();
 
     if (loading) {
         return (
@@ -240,9 +258,9 @@ export default function DashboardHome() {
                     <p style={S.heroLabel}>Available Balance</p>
                     <p style={S.heroAmount}>₦{balance.toLocaleString()}</p>
 
-                    {pct !== null && (
-                        <div style={S.heroBadge}>
-                            {pct >= 0 ? "+" : ""}{pct}% vs last month
+                    {balancePct !== null && (
+                        <div style={{ ...S.heroBadge, background: balancePct >= 0 ? "#4CAF50" : "#DC2626" }}>
+                            {balancePct >= 0 ? "+" : ""}{balancePct}% vs last month
                         </div>
                     )}
 
@@ -415,7 +433,7 @@ export default function DashboardHome() {
                 <div style={S.card}>
                     <div style={S.cardHead}>
                         <div>
-                            <div style={S.activityStat}>5k+</div>
+                            <div style={S.activityStat}>{activityStatText}</div>
                             <span style={S.cardTitle}>Activity</span>
                         </div>
                     </div>

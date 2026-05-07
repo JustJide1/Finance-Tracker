@@ -43,15 +43,13 @@ export default function Auth() {
         <div style={S.wrapper}>
             <div style={S.orb1} />
             <div style={S.orb2} />
+            <div style={S.orb3} />
 
             <div style={S.container} className="auth-container">
                 {/* Left: Branding */}
                 <div style={S.brandPanel} className="brand-panel">
                     <div style={S.brandLogo}>
-                        <div style={S.logoRing}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
-                        </div>
-                        <span style={S.logoText}>FinTrack</span>
+                        <span style={S.logoText}>MoneyMap</span>
                     </div>
 
                     <div style={S.brandMiddle}>
@@ -84,8 +82,7 @@ export default function Auth() {
                 <div style={S.formPanel} className="form-panel">
                     <div style={S.formCard} className="form-card">
                         <div style={S.mobileLogo} className="form-panel-mobile-logo">
-                            <div style={S.logoRing}><svg width="14" height="14" viewBox="0 0 24 24" fill="white"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg></div>
-                            <span style={S.logoText}>FinTrack</span>
+                            <span style={S.logoText}>MoneyMap</span>
                         </div>
 
                         <h2 style={S.heading}>{tab === "login" ? "Welcome back" : "Create account"}</h2>
@@ -172,22 +169,27 @@ const S = {
         background: "radial-gradient(circle, rgba(168,213,162,0.12) 0%, transparent 70%)",
         bottom: -150, right: -150, filter: "blur(60px)", pointerEvents: "none",
     },
+    orb3: {
+        position: "absolute", width: 350, height: 350, borderRadius: "50%",
+        background: "radial-gradient(circle, rgba(255,255,255,0.07) 0%, transparent 70%)",
+        top: "40%", left: "55%", filter: "blur(50px)", pointerEvents: "none",
+    },
     container: {
         width: "100%", maxWidth: 1050,
         background: "rgba(26,60,46,0.18)",
         backdropFilter: "blur(16px)",
-        border: "1px solid rgba(45,106,79,0.2)",
+        border: "1px solid rgba(255,255,255,0.1)",
         borderRadius: 24, overflow: "hidden",
         display: "grid", gridTemplateColumns: "1fr 1fr",
         minHeight: 600,
-        boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.08)",
         position: "relative", zIndex: 1,
     },
     brandPanel: {
         padding: "2.5rem",
         display: "flex", flexDirection: "column", justifyContent: "space-between",
         background: "rgba(45,106,79,0.08)",
-        borderRight: "1px solid rgba(45,106,79,0.15)",
+        borderRight: "1px solid rgba(255,255,255,0.07)",
     },
     brandLogo: { display: "flex", alignItems: "center", gap: 10 },
     logoRing: {
@@ -206,8 +208,8 @@ const S = {
     features: { display: "flex", flexDirection: "column", gap: "0.75rem" },
     feature: {
         padding: "0.875rem 1rem",
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(45,106,79,0.2)",
+        background: "rgba(255,255,255,0.05)",
+        border: "1px solid rgba(255,255,255,0.09)",
         borderRadius: 12,
     },
     featureTitle: { fontSize: 14, fontWeight: 600, color: "#f1f5f9" },
@@ -215,14 +217,20 @@ const S = {
     brandFooter:  { fontSize: 12, color: "rgba(241,245,249,0.3)", margin: 0 },
 
     formPanel: { padding: "2.5rem 2rem", display: "flex", alignItems: "center", justifyContent: "center" },
-    formCard: { width: "100%", maxWidth: 380 },
+    formCard: {
+        width: "100%", maxWidth: 380,
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.1)",
+        borderRadius: 18, padding: "2rem",
+        boxShadow: "0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.1)",
+    },
     mobileLogo: { display: "none", alignItems: "center", gap: 10, marginBottom: "1.5rem", justifyContent: "center" },
     heading:    { fontSize: 24, fontWeight: 700, color: "#f1f5f9", margin: "0 0 6px", letterSpacing: "-0.5px" },
     subheading: { fontSize: 14, color: "rgba(241,245,249,0.5)", margin: "0 0 1.5rem" },
     tabs: {
         display: "flex",
-        background: "rgba(255,255,255,0.05)",
-        border: "1px solid rgba(45,106,79,0.2)",
+        background: "rgba(255,255,255,0.07)",
+        border: "1px solid rgba(255,255,255,0.1)",
         borderRadius: 10, padding: 4, marginBottom: "1.5rem", gap: 4,
     },
     tabBtn: {
@@ -236,8 +244,8 @@ const S = {
     label: { display: "block", fontSize: 12, fontWeight: 500, color: "rgba(241,245,249,0.55)", marginBottom: 6 },
     input: {
         width: "100%", padding: "11px 14px", fontSize: 14,
-        border: "1px solid rgba(45,106,79,0.25)", borderRadius: 10, outline: "none",
-        color: "#f1f5f9", background: "rgba(255,255,255,0.06)", boxSizing: "border-box", fontFamily: "inherit",
+        border: "1px solid rgba(255,255,255,0.12)", borderRadius: 10, outline: "none",
+        color: "#f1f5f9", background: "rgba(255,255,255,0.08)", boxSizing: "border-box", fontFamily: "inherit",
     },
     btnPrimary: {
         width: "100%", padding: "13px", fontSize: 14, fontWeight: 600,
