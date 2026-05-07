@@ -366,7 +366,7 @@ Now parse this input:
         if (/uber|bolt|taxi|bus|transport|fuel|petrol|keke|okada/.test(lower)) category = "Transportation";
         else if (/shoprite|spar|food|eat|restaurant|suya|rice|jollof|lunch|dinner|breakfast/.test(lower)) category = "Food & Dining";
         else if (/netflix|spotify|cinema|movie|game|dstv/.test(lower)) category = "Entertainment";
-        else if (/nepa|electricity|water|internet|wifi|mtn|airtel|glo|bill/.test(lower)) category = "Bills & Utilities";
+        else if (/nepa|electricity|water|internet|wifi|mtn|airtel|glo|bill|rent|house rent|monthly rent/.test(lower)) category = "Bills & Utilities";
         else if (/hospital|pharmacy|doctor|clinic|drug|medicine/.test(lower)) category = "Healthcare";
         else if (/school|tuition|course|book|education/.test(lower)) category = "Education";
         else if (/salary|wages|payment|freelance/.test(lower)) category = "Salary";

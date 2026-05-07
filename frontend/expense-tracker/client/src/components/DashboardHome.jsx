@@ -81,7 +81,11 @@ function processTransactions(txns) {
         return `${d.getFullYear()}-${d.getMonth()}`;
     });
     const sparklineAmounts = {};
-    for (const k of sparklineMonths) sparklineAmounts[k] = 0;
+    const sparklineIncomeAmounts = {};
+    for (const k of sparklineMonths) {
+        sparklineAmounts[k] = 0;
+        sparklineIncomeAmounts[k] = 0;
+    }
 
     // 2. Single Pass iteration
     for (const t of txns) {
@@ -119,6 +123,10 @@ function processTransactions(txns) {
             if (sparklineAmounts[tKey] !== undefined) {
                 sparklineAmounts[tKey] += amount;
             }
+        } else if (type === "income") {
+            if (sparklineIncomeAmounts[tKey] !== undefined) {
+                sparklineIncomeAmounts[tKey] += amount;
+            }
         }
 
         if (tDateStr && weeklyAmounts[tDateStr] !== undefined) {
@@ -141,10 +149,11 @@ function processTransactions(txns) {
     }));
 
     const sl = sparklineMonths.map(k => ({ v: sparklineAmounts[k] }));
+    const slInc = sparklineMonths.map(k => ({ v: sparklineIncomeAmounts[k] }));
 
     const pct = lastMonthExpenses === 0 ? null : +((thisMonthExpenses - lastMonthExpenses) / lastMonthExpenses * 100).toFixed(1);
 
-    return { yd, sd, cd, wd, sl, pct };
+    return { yd, sd, cd, wd, sl, slInc, pct };
 }
 
 
@@ -193,10 +202,11 @@ export default function DashboardHome() {
 
     const hasData = transactions.length > 0;
 
-    const { yd, sd, cd, wd, sl, pct } = useMemo(() => processTransactions(transactions), [transactions]);
+    const { yd, sd, cd, wd, sl, slInc, pct } = useMemo(() => processTransactions(transactions), [transactions]);
 
     const balance         = stats?.balance         ?? 0;
     const totalExpenses   = stats?.totalExpenses   ?? 0;
+    const totalIncome     = stats?.totalIncome     ?? 0;
     const monthlyExpenses = stats?.monthlyExpenses ?? 0;
     const maxCat          = cd.length ? Math.max(...cd.map(d => d.amount)) : 1;
 
@@ -205,6 +215,8 @@ export default function DashboardHome() {
             <div style={S.wrapper}>
                 <div style={S.row1}>
                     <div style={{ ...S.card, height: 280, background: "linear-gradient(140deg,#1A3C2E,#2D6A4F)" }} />
+                    <div style={{ ...S.card, height: 280, background: "linear-gradient(140deg,#1E3A8A,#2563EB)" }} />
+                    <div style={{ ...S.card, height: 280, background: "linear-gradient(140deg,#7F1D1D,#B91C1C)" }} />
                     <div style={{ ...S.card, height: 280 }} />
                 </div>
                 <div style={S.row2}>
@@ -234,10 +246,7 @@ export default function DashboardHome() {
                         </div>
                     )}
 
-                    <p style={S.heroSub}>
-                        Balance Bigger &nbsp;·&nbsp;
-                        ₦{monthlyExpenses.toLocaleString()} Last Month
-                    </p>
+
 
                     {/* Sparkline pushed to bottom */}
                     <div style={S.heroChartWrap}>
@@ -253,6 +262,62 @@ export default function DashboardHome() {
                                     type="monotone" dataKey="v"
                                     stroke="#90EE90" strokeWidth={2}
                                     fill="url(#slGrad)" dot={false}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Income card */}
+                <div style={{ ...S.heroCard, background: "linear-gradient(140deg, #1E3A8A 0%, #2563EB 100%)", boxShadow: "0 8px 28px rgba(37,99,235,0.2)" }}>
+                    <p style={S.heroLabel}>Total Income</p>
+                    <p style={S.heroAmount}>₦{totalIncome.toLocaleString()}</p>
+
+                    {/* Sparkline pushed to bottom */}
+                    <div style={S.heroChartWrap}>
+                        <ResponsiveContainer width="100%" height={68}>
+                            <AreaChart data={slInc} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                <defs>
+                                    <linearGradient id="slGradInc" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%"  stopColor="#93C5FD" stopOpacity={0.45} />
+                                        <stop offset="95%" stopColor="#93C5FD" stopOpacity={0}    />
+                                    </linearGradient>
+                                </defs>
+                                <Area
+                                    type="monotone" dataKey="v"
+                                    stroke="#93C5FD" strokeWidth={2}
+                                    fill="url(#slGradInc)" dot={false}
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Expense card */}
+                <div style={{ ...S.heroCard, background: "linear-gradient(140deg, #7F1D1D 0%, #B91C1C 100%)", boxShadow: "0 8px 28px rgba(185,28,28,0.2)" }}>
+                    <p style={S.heroLabel}>Total Expenses</p>
+                    <p style={S.heroAmount}>₦{totalExpenses.toLocaleString()}</p>
+
+                    {pct !== null && (
+                        <div style={{ ...S.heroBadge, background: pct > 0 ? "#DC2626" : "#4CAF50" }}>
+                            {pct >= 0 ? "+" : ""}{pct}% vs last month
+                        </div>
+                    )}
+
+                    {/* Sparkline pushed to bottom */}
+                    <div style={S.heroChartWrap}>
+                        <ResponsiveContainer width="100%" height={68}>
+                            <AreaChart data={sl} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                                <defs>
+                                    <linearGradient id="slGradExp" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%"  stopColor="#FCA5A5" stopOpacity={0.45} />
+                                        <stop offset="95%" stopColor="#FCA5A5" stopOpacity={0}    />
+                                    </linearGradient>
+                                </defs>
+                                <Area
+                                    type="monotone" dataKey="v"
+                                    stroke="#FCA5A5" strokeWidth={2}
+                                    fill="url(#slGradExp)" dot={false}
                                 />
                             </AreaChart>
                         </ResponsiveContainer>
@@ -421,7 +486,7 @@ export default function DashboardHome() {
 const S = {
     wrapper: { display: "flex", flexDirection: "column", gap: 14 },
 
-    row1: { display: "grid", gridTemplateColumns: "2fr 3fr", gap: 14 },
+    row1: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 14 },
     row2: { display: "grid", gridTemplateColumns: "2fr 1fr 1.2fr", gap: 14 },
 
     card: {

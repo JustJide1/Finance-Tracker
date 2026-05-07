@@ -169,7 +169,7 @@ function QuickAdd({ onSuccess }) {
 
     const handleParse = useCallback(async (e) => {
         e.preventDefault();
-        if (input.trim().length < 10) {
+        if (input.trim().length < 4) {
             return toast.error("Please describe the transaction in a few words (e.g. 'Spent 2k on food')");
         }
         const data = await parseTransaction(input);
