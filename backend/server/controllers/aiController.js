@@ -36,7 +36,21 @@ async function generateWithRetry(primaryModel, prompt, maxRetries = 3) {
             } else if ((is503 && attempt === maxRetries) || is429) {
                 // Primary model exhausted or quota reached – try fallback immediately
                 console.warn(`⚠️  Primary model ${is429 ? "quota exceeded (429)" : "exhausted"}. Falling back to gemini-2.0-flash...`);
-                return await fallbackModel.generateContent(prompt);
+                try {
+                    return await fallbackModel.generateContent(prompt);
+                } catch (fallbackError) {
+                    const isFallback429 = fallbackError.status === 429 ||
+                        (fallbackError.message && (
+                            fallbackError.message.includes("429") ||
+                            fallbackError.message.toLowerCase().includes("quota exceeded")
+                        ));
+                    if (isFallback429) {
+                        const quotaErr = new Error("ALL_QUOTA_EXCEEDED");
+                        quotaErr.isQuotaError = true;
+                        throw quotaErr;
+                    }
+                    throw fallbackError;
+                }
             } else {
                 throw error; // Other errors bubble up immediately
             }
@@ -243,11 +257,17 @@ Respond with ONLY the JSON array, no other text.`;
         const insights = JSON.parse(response);
         return Array.isArray(insights) ? insights.slice(0, 3) : ["Keep tracking your expenses to get insights!"];
     } catch (error) {
-        console.error("Gemini insights error:", error);
+        if (error.isQuotaError || error.message === "ALL_QUOTA_EXCEEDED") {
+            console.warn("⚠️ All Gemini models quota exceeded. Returning rule-based insights.");
+        } else {
+            console.error("Gemini insights error:", error);
+        }
         return [
             `You've made ${currentExpenses.length} expense transaction(s) this ${period}.`,
-            topCategory ? `Your top spending category is ${topCategory[0]} (₦${topCategory[1].toLocaleString()}).` : "Start tracking expenses to see your top category.",
-            "AI insights are temporarily unavailable. Please try again in a moment."
+            topCategory
+                ? `Your top spending category is ${topCategory[0]} (₦${topCategory[1].toLocaleString()}).`
+                : "Start tracking expenses to see your top category.",
+            "AI insights are temporarily unavailable. Your quota resets daily — check back tomorrow."
         ];
     }
 };
@@ -308,7 +328,7 @@ exports.suggestCategory = async (req, res) => {
     }
 };
 
-const INSIGHT_TTL_MS = 60 * 60 * 1000; // 1 hour
+const INSIGHT_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
 // GET /api/ai/insights
 exports.getInsights = async (req, res) => {
@@ -366,12 +386,16 @@ exports.getInsights = async (req, res) => {
         await Insight.findOneAndUpdate(
             { userId, period },
             { insights, generatedAt: new Date() },
-            { upsert: true, new: true }
+            { upsert: true, returnDocument: 'after' }
         );
 
         res.json({ insights });
     } catch (err) {
         console.error("Failed to generate insights:", err);
+        const stale = await Insight.findOne({ userId: req.user.id, period: req.query.period || 'month' });
+        if (stale) {
+            return res.json({ insights: stale.insights, cached: true, stale: true });
+        }
         res.status(500).json({ message: "Failed to generate insights" });
     }
 };
@@ -426,9 +450,9 @@ exports.getForecast = async (req, res) => {
         const monthlyData = {};
         transactions.forEach(t => {
             const date = new Date(t.date);
-            const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-            const monthName = date.toLocaleDateString("en-US", { month: "short", year: "numeric" });
-            
+            const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+            const monthName = date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+
             if (!monthlyData[key]) {
                 monthlyData[key] = { key, monthName, amount: 0 };
             }
@@ -455,9 +479,9 @@ exports.getForecast = async (req, res) => {
         });
         const predictedAmount = weightedSum / weightTotal;
 
-        const lastDate = new Date(history[history.length - 1].key + "-01T00:00:00");
-        lastDate.setMonth(lastDate.getMonth() + 1);
-        const nextMonthName = lastDate.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+        const lastDate = new Date(history[history.length - 1].key + "-01T00:00:00Z");
+        lastDate.setUTCMonth(lastDate.getUTCMonth() + 1);
+        const nextMonthName = lastDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
 
         const forecastData = history.map(d => ({
             month: d.monthName,
@@ -467,6 +491,7 @@ exports.getForecast = async (req, res) => {
         
         const lastActual = history[history.length - 1].amount;
         forecastData[forecastData.length - 1].predicted = lastActual;
+        forecastData[forecastData.length - 1].isBridge = true;
         
         forecastData.push({
             month: nextMonthName,

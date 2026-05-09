@@ -1,6 +1,6 @@
-import { useMemo } from "react";
+import { useId } from "react";
 import {
-    LineChart, Line,
+    Line,
     XAxis, YAxis, Tooltip,
     ResponsiveContainer, CartesianGrid,
     Area, ComposedChart
@@ -8,6 +8,20 @@ import {
 
 function DarkTooltip({ active, payload, label }) {
     if (!active || !payload?.length) return null;
+
+    // Deduplicate by dataKey (Area + Line both emit for "actual")
+    // and suppress the bridge point's predicted entry (isBridge flag from backend)
+    const seen = new Set();
+    const entries = payload.filter(p => {
+        if (p.value == null) return false;
+        if (seen.has(p.dataKey)) return false;
+        seen.add(p.dataKey);
+        if (p.name === "Predicted" && p.payload?.isBridge) return false;
+        return true;
+    });
+
+    if (!entries.length) return null;
+
     return (
         <div style={{
             background: "#1A3C2E",
@@ -19,11 +33,10 @@ function DarkTooltip({ active, payload, label }) {
             pointerEvents: "none",
         }}>
             {label && <div style={{ opacity: 0.65, marginBottom: 4, fontSize: 11 }}>{label}</div>}
-            {payload.map((p, i) => {
-                if (p.value == null) return null;
+            {entries.map((p) => {
                 const isPredicted = p.name === "Predicted";
                 return (
-                    <div key={i} style={{ color: isPredicted ? "#FCD34D" : "#90EE90", lineHeight: 1.6 }}>
+                    <div key={p.name ?? p.dataKey} style={{ color: isPredicted ? "#FCD34D" : "#90EE90", lineHeight: 1.6 }}>
                         {p.name}: ₦{Number(p.value).toLocaleString()}
                     </div>
                 );
@@ -33,6 +46,9 @@ function DarkTooltip({ active, payload, label }) {
 }
 
 export default function ForecastChart({ data, loading }) {
+    const uid = useId().replace(/:/g, "");
+    const gradId = `forecastGrad-${uid}`;
+
     if (loading) {
         return (
             <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "8px 0", height: 180, justifyContent: 'center' }}>
@@ -55,7 +71,7 @@ export default function ForecastChart({ data, loading }) {
         <ResponsiveContainer width="100%" height={180}>
             <ComposedChart data={data} margin={{ top: 5, right: 10, bottom: 0, left: 0 }}>
                 <defs>
-                    <linearGradient id="forecastGrad" x1="0" y1="0" x2="0" y2="1">
+                    <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#2D6A4F" stopOpacity={0.2} />
                         <stop offset="95%" stopColor="#2D6A4F" stopOpacity={0} />
                     </linearGradient>
@@ -70,7 +86,7 @@ export default function ForecastChart({ data, loading }) {
                 <Tooltip content={<DarkTooltip />} />
                 
                 {/* Area for past actuals */}
-                <Area type="monotone" dataKey="actual" fill="url(#forecastGrad)" stroke="none" />
+                <Area type="monotone" dataKey="actual" fill={`url(#${gradId})`} stroke="none" />
                 
                 {/* Solid line for actuals */}
                 <Line type="monotone" dataKey="actual" stroke="#2D6A4F" strokeWidth={2.5} dot={{ r: 3, fill: "#2D6A4F", strokeWidth: 0 }} name="Actual" connectNulls />
