@@ -10,9 +10,10 @@ export const useTransactions = (type) => {
     const fetchTransactions = useCallback(async () => {
         setLoading(true);
         try {
-            const data = await transactionService.getTransactions();
-            const filtered = type ? data.filter(t => t.type === type) : data;
-            setTransactions(filtered);
+            // Pass type to the server so only matching documents are fetched
+            const params = type ? { type, limit: 200 } : { limit: 200 };
+            const { transactions: data } = await transactionService.getTransactions(params);
+            setTransactions(data);
         } catch (err) {
             console.error("Failed to fetch transactions");
         } finally {

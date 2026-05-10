@@ -1,13 +1,18 @@
 import axios from './axios';
 
 export const transactionService = {
+    getDashboard: async () => {
+        const response = await axios.get('/dashboard');
+        return response.data; // { stats, transactions }
+    },
     getStats: async () => {
         const response = await axios.get('/transactions/stats');
         return response.data;
     },
-    getTransactions: async () => {
-        const response = await axios.get('/transactions');
-        return response.data;
+    // params: { type, category, search, startDate, endDate, page, limit }
+    getTransactions: async (params = {}) => {
+        const response = await axios.get('/transactions', { params });
+        return response.data; // { transactions, pagination }
     },
     createTransaction: async (payload) => {
         const response = await axios.post('/transactions', payload);

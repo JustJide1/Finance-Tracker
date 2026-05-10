@@ -15,14 +15,11 @@ export const useDashboardData = () => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const [statsData, transactionsData] = await Promise.all([
-                transactionService.getStats(),
-                transactionService.getTransactions(),
-            ]);
-            
+            // Single request: stats aggregation + transactions in one round-trip
+            const { stats: statsData, transactions: txns } = await transactionService.getDashboard();
             setStats(statsData);
-            setTransactions(transactionsData);
-            setRecentTransactions(transactionsData.slice(0, 5));
+            setTransactions(txns);
+            setRecentTransactions(txns.slice(0, 5));
         } catch (err) {
             console.error("Failed to fetch dashboard data", err);
         } finally {
@@ -34,11 +31,5 @@ export const useDashboardData = () => {
         fetchData();
     }, [fetchData]);
 
-    return {
-        stats,
-        transactions,
-        recentTransactions,
-        loading,
-        fetchData
-    };
+    return { stats, transactions, recentTransactions, loading, fetchData };
 };

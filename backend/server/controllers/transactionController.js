@@ -1,13 +1,40 @@
+const mongoose = require("mongoose");
 const Transaction = require("../models/Transaction");
 const Budget = require("../models/Budget");
 const CategoryCorrection = require("../models/CategoryCorrection");
+const { invalidate: invalidateCorrectionCache } = require("../utils/correctionCache");
 
-// Get all transactions for logged-in user
+// Get transactions — supports ?type=expense|income &category= &search= &startDate= &endDate= &page= &limit=
 exports.getTransactions = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ userId: req.user.id })
-            .sort({ date: -1 });
-        res.json(transactions);
+        const { type, category, startDate, endDate, search, page = 1, limit = 50 } = req.query;
+
+        const filter = { userId: req.user.id };
+        if (type)     filter.type     = type;
+        if (category) filter.category = category;
+        if (search)   filter.description = { $regex: search, $options: "i" };
+        if (startDate || endDate) {
+            filter.date = {};
+            if (startDate) filter.date.$gte = new Date(startDate);
+            if (endDate)   filter.date.$lte = new Date(endDate);
+        }
+
+        const pageNum  = Math.max(1, parseInt(page)  || 1);
+        const pageSize = Math.min(200, Math.max(1, parseInt(limit) || 50));
+
+        const [transactions, total] = await Promise.all([
+            Transaction.find(filter)
+                .sort({ date: -1 })
+                .skip((pageNum - 1) * pageSize)
+                .limit(pageSize)
+                .lean(),
+            Transaction.countDocuments(filter),
+        ]);
+
+        res.json({
+            transactions,
+            pagination: { page: pageNum, limit: pageSize, total, pages: Math.ceil(total / pageSize) },
+        });
     } catch (err) {
         res.status(500).json({ message: "Server error" });
     }
@@ -31,7 +58,6 @@ exports.getTransaction = async (req, res) => {
 
 // Create transaction
 exports.createTransaction = async (req, res) => {
-    console.log("Raw body received:", req.body);
     const { type, amount, category, description, date } = req.body;
 
     try {
@@ -141,6 +167,7 @@ exports.updateTransaction = async (req, res) => {
                     originalCategory: effectiveOriginal,
                     correctedCategory: category,
                 });
+                invalidateCorrectionCache(req.user.id);
             }
         }
 
@@ -201,34 +228,41 @@ exports.deleteAllIncome = async (req, res) => {
     }
 };
 
-// Get summary stats
+// Get summary stats via aggregation — no full document load
 exports.getStats = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ userId: req.user.id });
-
-        const totalIncome = transactions
-            .filter(t => t.type === "income")
-            .reduce((sum, t) => sum + t.amount, 0);
-
-        const totalExpenses = transactions
-            .filter(t => t.type === "expense")
-            .reduce((sum, t) => sum + t.amount, 0);
-
-        const balance = totalIncome - totalExpenses;
-
-        // Monthly expenses (current month)
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const monthlyExpenses = transactions
-            .filter(t => t.type === "expense" && new Date(t.date) >= startOfMonth)
-            .reduce((sum, t) => sum + t.amount, 0);
+        const userId = new mongoose.Types.ObjectId(req.user.id);
 
-        res.json({
-            balance,
-            totalIncome,
-            totalExpenses,
-            monthlyExpenses,
-        });
+        const [agg] = await Transaction.aggregate([
+            { $match: { userId } },
+            {
+                $group: {
+                    _id: null,
+                    totalIncome: {
+                        $sum: { $cond: [{ $eq: ["$type", "income"] }, "$amount", 0] }
+                    },
+                    totalExpenses: {
+                        $sum: { $cond: [{ $eq: ["$type", "expense"] }, "$amount", 0] }
+                    },
+                    monthlyExpenses: {
+                        $sum: {
+                            $cond: [
+                                { $and: [{ $eq: ["$type", "expense"] }, { $gte: ["$date", startOfMonth] }] },
+                                "$amount", 0
+                            ]
+                        }
+                    },
+                }
+            }
+        ]);
+
+        const totalIncome    = agg?.totalIncome     ?? 0;
+        const totalExpenses  = agg?.totalExpenses   ?? 0;
+        const monthlyExpenses = agg?.monthlyExpenses ?? 0;
+
+        res.json({ balance: totalIncome - totalExpenses, totalIncome, totalExpenses, monthlyExpenses });
     } catch (err) {
         res.status(500).json({ message: "Server error" });
     }

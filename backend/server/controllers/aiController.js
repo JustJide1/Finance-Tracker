@@ -1,75 +1,32 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const Transaction = require("../models/Transaction");
 const Insight = require("../models/Insight");
 const CategoryCorrection = require("../models/CategoryCorrection");
+const { generate, QUEUE_FULL_MSG, QUOTA_EXCEEDED_MSG } = require("../utils/geminiLimiter");
+const { getRecentCorrections } = require("../utils/correctionCache");
+const { getCachedCategory, setCachedCategory } = require("../utils/categorizationCache");
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-const fallbackModel = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
-/**
- * Retries a Gemini generateContent call with exponential backoff.
- * Falls back to gemini-1.5-flash after primary model exhausts retries.
- * @param {object} primaryModel - The primary Gemini model instance
- * @param {string} prompt - The prompt to send
- * @param {number} maxRetries - Max attempts on primary model (default 3)
- * @returns {Promise<object>} Gemini result object
- */
-async function generateWithRetry(primaryModel, prompt, maxRetries = 3) {
-    for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-            return await primaryModel.generateContent(prompt);
-        } catch (error) {
-            const is503 = error.status === 503 ||
-                (error.message && error.message.includes("503")) ||
-                (error.message && error.message.toLowerCase().includes("service unavailable"));
-
-            const is429 = error.status === 429 ||
-                (error.message && error.message.includes("429")) ||
-                (error.message && error.message.toLowerCase().includes("quota exceeded")) ||
-                (error.message && error.message.toLowerCase().includes("too many requests"));
-
-            if (is503 && attempt < maxRetries) {
-                const delayMs = Math.pow(2, attempt) * 1000; // 2s, 4s
-                console.warn(`⚠️  Gemini 503 on attempt ${attempt}/${maxRetries}. Retrying in ${delayMs / 1000}s...`);
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            } else if ((is503 && attempt === maxRetries) || is429) {
-                // Primary model exhausted or quota reached – try fallback immediately
-                console.warn(`⚠️  Primary model ${is429 ? "quota exceeded (429)" : "exhausted"}. Falling back to gemini-2.0-flash...`);
-                try {
-                    return await fallbackModel.generateContent(prompt);
-                } catch (fallbackError) {
-                    const isFallback429 = fallbackError.status === 429 ||
-                        (fallbackError.message && (
-                            fallbackError.message.includes("429") ||
-                            fallbackError.message.toLowerCase().includes("quota exceeded")
-                        ));
-                    if (isFallback429) {
-                        const quotaErr = new Error("ALL_QUOTA_EXCEEDED");
-                        quotaErr.isQuotaError = true;
-                        throw quotaErr;
-                    }
-                    throw fallbackError;
-                }
-            } else {
-                throw error; // Other errors bubble up immediately
-            }
-        }
-    }
+// Returns true when the error means the AI system is temporarily overloaded —
+// callers should respond with 503 + Retry-After rather than a generic 500.
+function isOverloadError(err) {
+    return (
+        err?.isLimiterError ||
+        err?.isTimeout ||
+        err?.message === QUEUE_FULL_MSG ||
+        err?.message === QUOTA_EXCEEDED_MSG ||
+        err?.isQuotaError
+    );
 }
 
 
 
 // Test Gemini connection
 exports.testGemini = async (req, res) => {
-    const { GoogleGenerativeAI } = require("@google/generative-ai");
-
     if (!process.env.GEMINI_API_KEY) {
         return res.status(500).json({ error: "GEMINI_API_KEY not found in environment" });
     }
 
     try {
-        const result = await generateWithRetry(model, "Say hello");
+        const result = await generate("Say hello");
         const response = result.response.text();
         res.json({ success: true, response });
     } catch (error) {
@@ -157,6 +114,12 @@ const categorizeByRules = (description) => {
 
 // Auto-categorize a transaction, optionally using recent user corrections as few-shot examples
 exports.categorizeTransaction = async (description, recentCorrections = []) => {
+    // Cache hit only when there are no user-specific corrections (result is user-neutral)
+    if (recentCorrections.length === 0) {
+        const cached = getCachedCategory(description);
+        if (cached) return cached;
+    }
+
     let fewShotSection = "";
     if (recentCorrections.length > 0) {
         const examples = recentCorrections
@@ -186,9 +149,10 @@ Transaction description: "${description}"
 Respond with ONLY the category name, nothing else.`;
 
     try {
-        const result = await generateWithRetry(model, prompt);
+        const result = await generate(prompt);
         const category = result.response.text().trim();
         console.log("✅ Gemini categorized:", description, "→", category);
+        if (recentCorrections.length === 0) setCachedCategory(description, category);
         return category;
     } catch (error) {
         if (error.message && error.message.includes("429")) {
@@ -249,7 +213,7 @@ Example format:
 Respond with ONLY the JSON array, no other text.`;
 
     try {
-        const result = await generateWithRetry(model, prompt);
+        const result = await generate(prompt);
         let response = result.response.text().trim();
 
         response = response.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
@@ -300,7 +264,7 @@ Write ONE friendly alert message (max 20 words) asking if these were intended pu
 Respond with ONLY the message text, no quotes or formatting.`;
 
     try {
-        const result = await generateWithRetry(model, prompt);
+        const result = await generate(prompt);
         return result.response.text().trim();
     } catch (error) {
         console.error("Gemini anomaly detection error:", error);
@@ -317,10 +281,7 @@ exports.suggestCategory = async (req, res) => {
         return res.status(400).json({ message: "Description is required" });
     }
     try {
-        const recentCorrections = await CategoryCorrection.find({ userId: req.user.id })
-            .sort({ createdAt: -1 })
-            .limit(10)
-            .select("description originalCategory correctedCategory");
+        const recentCorrections = await getRecentCorrections(req.user.id);
         const category = await exports.categorizeTransaction(description, recentCorrections);
         res.json({ category });
     } catch (err) {
@@ -371,14 +332,16 @@ exports.getInsights = async (req, res) => {
             previousEnd = new Date(0);
         }
 
-        const allTransactions = await Transaction.find({ userId });
-        
-        let currentTransactions = allTransactions;
-        let previousTransactions = [];
+        let currentTransactions, previousTransactions;
 
-        if (period !== 'all') {
-            currentTransactions = allTransactions.filter(t => new Date(t.date) >= currentStart);
-            previousTransactions = allTransactions.filter(t => new Date(t.date) >= previousStart && new Date(t.date) <= previousEnd);
+        if (period === 'all') {
+            currentTransactions = await Transaction.find({ userId }).lean();
+            previousTransactions = [];
+        } else {
+            [currentTransactions, previousTransactions] = await Promise.all([
+                Transaction.find({ userId, date: { $gte: currentStart } }).lean(),
+                Transaction.find({ userId, date: { $gte: previousStart, $lte: previousEnd } }).lean(),
+            ]);
         }
 
         const insights = await exports.generateInsights(currentTransactions, previousTransactions, period);
@@ -392,7 +355,13 @@ exports.getInsights = async (req, res) => {
         res.json({ insights });
     } catch (err) {
         console.error("Failed to generate insights:", err);
-        const stale = await Insight.findOne({ userId: req.user.id, period: req.query.period || 'month' });
+        if (isOverloadError(err)) {
+            // Serve stale cache before giving up — better than a 503 blank
+            const stale = await Insight.findOne({ userId: req.user.id, period: req.query.period || "month" }).catch(() => null);
+            if (stale) return res.json({ insights: stale.insights, cached: true, stale: true });
+            return res.status(503).set("Retry-After", "60").json({ message: "AI system is busy, please retry shortly." });
+        }
+        const stale = await Insight.findOne({ userId: req.user.id, period: req.query.period || 'month' }).catch(() => null);
         if (stale) {
             return res.json({ insights: stale.insights, cached: true, stale: true });
         }
@@ -403,10 +372,20 @@ exports.getInsights = async (req, res) => {
 // GET /api/ai/anomalies
 exports.checkAnomalies = async (req, res) => {
     try {
-        const transactions = await Transaction.find({ userId: req.user.id });
+        // Anomaly detection only needs recent history (last 90 days) to compute a
+        // meaningful average. Loading all-time transactions per user at 100 concurrent
+        // users would exhaust the MongoDB connection pool.
+        const since = new Date();
+        since.setDate(since.getDate() - 90);
+        const transactions = await Transaction.find(
+            { userId: req.user.id, date: { $gte: since } }
+        ).lean();
         const alert = await exports.detectAnomalies(transactions);
         res.json({ alert });
     } catch (err) {
+        if (isOverloadError(err)) {
+            return res.status(503).set("Retry-After", "60").json({ message: "AI system is busy, please retry shortly." });
+        }
         res.status(500).json({ message: "Failed to check anomalies" });
     }
 };
@@ -437,87 +416,172 @@ exports.getAccuracy = async (req, res) => {
     }
 };
 
+// Builds chart-ready forecast data from an array of expense transactions.
+// Returns { forecastData, predictedAmount, history } — reused by getForecast + getAIDashboard.
+function buildForecastData(transactions) {
+    const monthlyData = {};
+    for (const t of transactions) {
+        const date = new Date(t.date);
+        const key  = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
+        const monthName = date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+        if (!monthlyData[key]) monthlyData[key] = { key, monthName, amount: 0 };
+        monthlyData[key].amount += t.amount;
+    }
+
+    const history = Object.keys(monthlyData).sort().slice(-6).map(k => monthlyData[k]);
+
+    if (history.length < 2) {
+        return {
+            forecastData:    history.map(d => ({ month: d.monthName, actual: d.amount, predicted: null })),
+            predictedAmount: null,
+            history,
+        };
+    }
+
+    let weightedSum = 0, weightTotal = 0;
+    history.forEach((item, i) => { weightedSum += item.amount * (i + 1); weightTotal += (i + 1); });
+    const predictedAmount = weightedSum / weightTotal;
+
+    const lastDate = new Date(history[history.length - 1].key + "-01T00:00:00Z");
+    lastDate.setUTCMonth(lastDate.getUTCMonth() + 1);
+    const nextMonthName = lastDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+
+    const forecastData = history.map(d => ({ month: d.monthName, actual: d.amount, predicted: null }));
+    forecastData[forecastData.length - 1].predicted = history[history.length - 1].amount;
+    forecastData[forecastData.length - 1].isBridge  = true;
+    forecastData.push({ month: nextMonthName, actual: null, predicted: predictedAmount });
+
+    return { forecastData, predictedAmount, history };
+}
+
 // GET /api/ai/forecast
 exports.getForecast = async (req, res) => {
     try {
         const userId = req.user.id;
-        const transactions = await Transaction.find({ userId, type: "expense" });
+        const transactions = await Transaction.find({ userId, type: "expense" }).lean();
 
-        if (!transactions || transactions.length === 0) {
+        if (!transactions.length) {
             return res.json({ forecastData: [], insight: "Not enough data to generate a forecast." });
         }
 
-        const monthlyData = {};
-        transactions.forEach(t => {
-            const date = new Date(t.date);
-            const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
-            const monthName = date.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
+        const { forecastData, predictedAmount, history } = buildForecastData(transactions);
 
-            if (!monthlyData[key]) {
-                monthlyData[key] = { key, monthName, amount: 0 };
-            }
-            monthlyData[key].amount += t.amount;
-        });
-
-        const sortedKeys = Object.keys(monthlyData).sort();
-        const recentKeys = sortedKeys.slice(-6);
-        const history = recentKeys.map(k => monthlyData[k]);
-
-        if (history.length < 2) {
-             return res.json({ 
-                 forecastData: history.map(d => ({ month: d.monthName, actual: d.amount, predicted: null })),
-                 insight: "We need at least two months of data to make a reliable prediction."
-             });
+        if (predictedAmount === null) {
+            return res.json({ forecastData, insight: "We need at least two months of data to make a reliable prediction." });
         }
 
-        let weightedSum = 0;
-        let weightTotal = 0;
-        history.forEach((item, index) => {
-            const weight = index + 1;
-            weightedSum += item.amount * weight;
-            weightTotal += weight;
-        });
-        const predictedAmount = weightedSum / weightTotal;
+        let insight = `Based on your recent spending, we project your expenses will be around ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} next month.`;
 
-        const lastDate = new Date(history[history.length - 1].key + "-01T00:00:00Z");
-        lastDate.setUTCMonth(lastDate.getUTCMonth() + 1);
-        const nextMonthName = lastDate.toLocaleDateString("en-US", { month: "short", year: "numeric", timeZone: "UTC" });
-
-        const forecastData = history.map(d => ({
-            month: d.monthName,
-            actual: d.amount,
-            predicted: null
-        }));
-        
-        const lastActual = history[history.length - 1].amount;
-        forecastData[forecastData.length - 1].predicted = lastActual;
-        forecastData[forecastData.length - 1].isBridge = true;
-        
-        forecastData.push({
-            month: nextMonthName,
-            actual: null,
-            predicted: predictedAmount
-        });
-
-        let insight = `Based on your recent spending, we project your expenses will be around ₦${predictedAmount.toLocaleString(undefined, {maximumFractionDigits:0})} next month.`;
-        
         const prompt = `A user has the following recent monthly expense totals (in NGN):
 ${history.map(h => `${h.monthName}: ₦${h.amount.toLocaleString()}`).join("\n")}
 
-The statistical forecast for next month is ₦${predictedAmount.toLocaleString(undefined, {maximumFractionDigits:0})}.
+The statistical forecast for next month is ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}.
 Write a single, encouraging, and practical 1-sentence financial insight or tip about this trend for the user. Do not mention the exact word "statistical forecast". Focus on actionable advice.`;
 
         try {
-            const result = await generateWithRetry(model, prompt);
+            const result = await generate(prompt);
             insight = result.response.text().trim();
         } catch (err) {
             console.error("Gemini forecast insight error:", err.message);
         }
 
         res.json({ forecastData, insight });
-
     } catch (err) {
         console.error("Forecast generation error:", err);
         res.status(500).json({ message: "Failed to generate forecast" });
+    }
+};
+
+// GET /api/ai/dashboard — single DB fetch, all three Gemini calls concurrent
+exports.getAIDashboard = async (req, res) => {
+    try {
+        const userId = req.user.id;
+        const period = req.query.period || "month";
+
+        // Check insights cache before the DB fetch so we can skip that Gemini call if warm
+        const cachedInsights = await Insight.findOne({ userId, period });
+        const insightsCached = cachedInsights &&
+            Date.now() - cachedInsights.generatedAt.getTime() < INSIGHT_TTL_MS;
+
+        // One DB round-trip for all AI data
+        const allTransactions = await Transaction.find({ userId }).lean();
+
+        // Build period date ranges (mirrors getInsights logic)
+        const now = new Date();
+        let currentStart, previousStart, previousEnd;
+        if (period === "week") {
+            const day = now.getDay() || 7;
+            currentStart = new Date(now); currentStart.setHours(0, 0, 0, 0); currentStart.setDate(now.getDate() - day + 1);
+            previousEnd  = new Date(currentStart); previousEnd.setMilliseconds(-1);
+            previousStart = new Date(previousEnd);  previousStart.setDate(previousStart.getDate() - 6); previousStart.setHours(0, 0, 0, 0);
+        } else if (period === "month") {
+            currentStart  = new Date(now.getFullYear(), now.getMonth(), 1);
+            previousEnd   = new Date(currentStart); previousEnd.setMilliseconds(-1);
+            previousStart = new Date(previousEnd.getFullYear(), previousEnd.getMonth(), 1);
+        } else if (period === "year") {
+            currentStart  = new Date(now.getFullYear(), 0, 1);
+            previousEnd   = new Date(currentStart); previousEnd.setMilliseconds(-1);
+            previousStart = new Date(previousEnd.getFullYear(), 0, 1);
+        } else {
+            currentStart = previousStart = previousEnd = new Date(0);
+        }
+
+        const currentTransactions  = period === "all" ? allTransactions
+            : allTransactions.filter(t => new Date(t.date) >= currentStart);
+        const previousTransactions = period === "all" ? []
+            : allTransactions.filter(t => new Date(t.date) >= previousStart && new Date(t.date) <= previousEnd);
+
+        // Build forecast data from expenses in the shared transaction set
+        const { forecastData, predictedAmount, history } = buildForecastData(
+            allTransactions.filter(t => t.type === "expense")
+        );
+
+        // Build the forecast Gemini prompt lazily (only if there's enough data)
+        let forecastGeminiPromise = Promise.resolve(
+            predictedAmount !== null
+                ? `Based on your recent spending, we project your expenses will be around ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} next month.`
+                : null
+        );
+        if (predictedAmount !== null && history.length >= 2) {
+            const fPrompt = `A user has the following recent monthly expense totals (in NGN):
+${history.map(h => `${h.monthName}: ₦${h.amount.toLocaleString()}`).join("\n")}
+
+The statistical forecast for next month is ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}.
+Write a single, encouraging, and practical 1-sentence financial insight or tip about this trend for the user. Do not mention the exact word "statistical forecast". Focus on actionable advice.`;
+            forecastGeminiPromise = generate(fPrompt)
+                .then(r => r.response.text().trim())
+                .catch(() => `Based on your recent spending, we project your expenses will be around ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} next month.`);
+        }
+
+        // All three Gemini calls fire concurrently
+        const [insightsResult, anomaly, forecastInsight] = await Promise.all([
+            insightsCached
+                ? Promise.resolve(cachedInsights.insights)
+                : exports.generateInsights(currentTransactions, previousTransactions, period),
+            exports.detectAnomalies(allTransactions),
+            forecastGeminiPromise,
+        ]);
+
+        // Persist refreshed insights
+        if (!insightsCached) {
+            Insight.findOneAndUpdate(
+                { userId, period },
+                { insights: insightsResult, generatedAt: new Date() },
+                { upsert: true }
+            ).catch(err => console.error("Failed to persist insights cache:", err));
+        }
+
+        res.json({ insights: insightsResult, anomaly, forecastData, forecastInsight });
+    } catch (err) {
+        console.error("AI dashboard error:", err);
+        if (isOverloadError(err)) {
+            // Serve stale insights from the DB cache so the dashboard isn't blank
+            const stale = await Insight.findOne({ userId: req.user.id, period: req.query.period || "month" }).catch(() => null);
+            if (stale) {
+                return res.json({ insights: stale.insights, anomaly: null, forecastData: [], forecastInsight: null, stale: true });
+            }
+            return res.status(503).set("Retry-After", "60").json({ message: "AI system is busy, please retry shortly." });
+        }
+        res.status(500).json({ message: "Failed to load AI dashboard" });
     }
 };

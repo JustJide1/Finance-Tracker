@@ -19,10 +19,9 @@ export default function Expenses() {
 
     const fetchExpenseTransactions = async () => {
         try {
-            const { data } = await axios.get("/transactions");
-            const expenses = data.filter(t => t.type === "expense");
-            setAllTransactions(expenses);
-            setFilteredTransactions(expenses);
+            const { data } = await axios.get("/transactions", { params: { type: "expense", limit: 200 } });
+            setAllTransactions(data.transactions);
+            setFilteredTransactions(data.transactions);
         } catch (err) { console.error("Failed to fetch transactions:", err?.response?.data || err.message); }
     };
 

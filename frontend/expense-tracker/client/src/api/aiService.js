@@ -24,5 +24,10 @@ export const aiService = {
     getCategoryAccuracy: async () => {
         const response = await axios.get('/ai/accuracy');
         return response.data;
-    }
+    },
+    // Returns { insights, anomaly, forecastData, forecastInsight } in one request
+    getDashboard: async (period = 'month') => {
+        const response = await axios.get(`/ai/dashboard?period=${period}`);
+        return response.data;
+    },
 };

@@ -1,44 +1,64 @@
+const mongoose = require("mongoose");
 const Budget = require("../models/Budget");
 const Transaction = require("../models/Transaction");
 
-// Get all budgets with current spending
+// Get all budgets with current spending — single aggregation, no JS iteration
 exports.getBudgets = async (req, res) => {
     try {
-        const budgets = await Budget.find({ userId: req.user.id });
-
-        // Calculate spending per budget
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        // Monday-anchored week start (consistent with createTransaction)
         const startOfWeek = new Date(now);
-        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7));
         startOfWeek.setHours(0, 0, 0, 0);
 
-        const transactions = await Transaction.find({
-            userId: req.user.id,
-            type: "expense",
-        });
+        // Run both queries in parallel — no need to wait for budgets before starting the aggregation
+        const [budgets, spentAgg] = await Promise.all([
+            Budget.find({ userId: req.user.id }),
+            Transaction.aggregate([
+                {
+                    $match: {
+                        userId: new mongoose.Types.ObjectId(req.user.id),
+                        type:   "expense",
+                        date:   { $gte: startOfWeek },
+                    }
+                },
+                {
+                    $group: {
+                        _id: "$category",
+                        monthlySpent: {
+                            $sum: { $cond: [{ $gte: ["$date", startOfMonth] }, "$amount", 0] }
+                        },
+                        weeklySpent: { $sum: "$amount" },
+                    }
+                }
+            ]),
+        ]);
+        if (budgets.length === 0) return res.json([]);
+
+        const spentMap = Object.fromEntries(
+            spentAgg.map(r => [r._id, { monthly: r.monthlySpent, weekly: r.weeklySpent }])
+        );
 
         const budgetsWithProgress = budgets.map(budget => {
-            const startDate = budget.period === "weekly" ? startOfWeek : startOfMonth;
-
-            const spent = transactions
-                .filter(t => t.category === budget.category && new Date(t.date) >= startDate)
-                .reduce((sum, t) => sum + t.amount, 0);
+            const spent = budget.period === "weekly"
+                ? (spentMap[budget.category]?.weekly  ?? 0)
+                : (spentMap[budget.category]?.monthly ?? 0);
 
             const percentage = budget.amount > 0 ? (spent / budget.amount) * 100 : 0;
 
             let status = "safe";
-            if (percentage >= 100) status = "exceeded";
+            if (percentage >= 100)     status = "exceeded";
             else if (percentage >= 80) status = "warning";
             else if (percentage >= 50) status = "moderate";
 
             return {
-                _id: budget._id,
-                category: budget.category,
-                amount: budget.amount,
-                period: budget.period,
+                _id:        budget._id,
+                category:   budget.category,
+                amount:     budget.amount,
+                period:     budget.period,
                 spent,
-                remaining: Math.max(0, budget.amount - spent),
+                remaining:  Math.max(0, budget.amount - spent),
                 percentage: Math.min(100, percentage),
                 status,
             };

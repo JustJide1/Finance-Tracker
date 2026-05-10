@@ -46,4 +46,10 @@ const TransactionSchema = new mongoose.Schema({
     },
 }, { timestamps: true });
 
+// Compound indexes covering the most common query patterns
+TransactionSchema.index({ userId: 1, date: -1 });
+TransactionSchema.index({ userId: 1, type: 1, date: -1 });
+TransactionSchema.index({ userId: 1, category: 1 });
+TransactionSchema.index({ userId: 1, aiSuggestedCategory: 1, userOverrode: 1 });
+
 module.exports = mongoose.model("Transaction", TransactionSchema);

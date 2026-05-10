@@ -1,8 +1,5 @@
-const { GoogleGenerativeAI } = require("@google/generative-ai");
 const CATEGORIES = require("../../../shared/categories");
-
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+const { generate } = require("../utils/geminiLimiter");
 
 // Auto-categorize a transaction
 exports.categorizeTransaction = async (description) => {
@@ -14,7 +11,7 @@ Transaction description: "${description}"
 Respond with ONLY the category name, nothing else.`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await generate(prompt);
         const category = result.response.text().trim();
         return category;
     } catch (error) {
@@ -64,7 +61,7 @@ Example format:
 Respond with ONLY the JSON array, no other text.`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await generate(prompt);
         let response = result.response.text().trim();
 
         // Clean up markdown code blocks if present
@@ -110,7 +107,7 @@ Write ONE friendly alert message (max 20 words) asking if these were intended pu
 Respond with ONLY the message text, no quotes or formatting.`;
 
     try {
-        const result = await model.generateContent(prompt);
+        const result = await generate(prompt);
         return result.response.text().trim();
     } catch (error) {
         console.error("Gemini anomaly detection error:", error);
@@ -207,7 +204,7 @@ Now parse this input:
 "${text}"`;
 
         try {
-            const result = await model.generateContent(prompt);
+            const result = await generate(prompt);
             let response = result.response.text().trim();
 
             // Clean up markdown if present
@@ -217,7 +214,7 @@ Now parse this input:
             console.log("✅ Gemini parsed:", text, "→", parsed);
             return parsed;
         } catch (error) {
-            if (error.message?.includes("429")) {
+            if (error.isQuotaError || error.message?.includes("429")) {
                 console.warn("⚠️ Gemini quota exceeded, using rule-based parser");
                 return parseByRules(text);
             }

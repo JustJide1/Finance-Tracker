@@ -1,9 +1,11 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function TransactionFilters({ onFilter, categories = [] }) {
     const [filters, setFilters] = useState({ search: "", category: "", startDate: "", endDate: "" });
     const [expanded, setExpanded] = useState(false);
     const searchTimer = useRef(null);
+
+    useEffect(() => () => clearTimeout(searchTimer.current), []);
 
     const handleChange = (key, value) => {
         const updated = { ...filters, [key]: value };

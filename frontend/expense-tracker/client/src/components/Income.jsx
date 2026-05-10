@@ -18,10 +18,9 @@ export default function Income() {
 
     const fetchIncomeTransactions = async () => {
         try {
-            const { data } = await axios.get("/transactions");
-            const income = data.filter(t => t.type === "income");
-            setAllTransactions(income);
-            setFilteredTransactions(income);
+            const { data } = await axios.get("/transactions", { params: { type: "income", limit: 200 } });
+            setAllTransactions(data.transactions);
+            setFilteredTransactions(data.transactions);
         } catch { console.error("Failed to fetch transactions"); }
     };
 
