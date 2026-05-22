@@ -99,16 +99,16 @@ export default function Income() {
             <div style={S.card}>
                 <h3 style={S.cardTitle}>{editingId ? "Edit Income Entry" : "Add Income Entry"}</h3>
                 <form onSubmit={handleSubmit} style={S.form}>
-                    <input style={S.input} type="number" placeholder="Amount (e.g. 50000)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                    <input style={S.input} type="text"   placeholder="Description"          value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
+                    <input style={S.input} name="amount" type="number" placeholder="Amount (e.g. 50000)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                    <input style={S.input} name="description" type="text" placeholder="Description" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
                     <div style={S.catWrap}>
-                        <select style={{ ...S.input, paddingRight: 40 }} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} disabled={suggesting}>
+                        <select style={{ ...S.input, paddingRight: 40 }} name="category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} disabled={suggesting}>
                             <option value="">{suggesting ? "AI is categorising..." : "Category"}</option>
                             {CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
                         </select>
                         <button type="button" style={S.aiBtn} onClick={handleSuggestCategory} disabled={suggesting}>{suggesting ? "..." : "AI"}</button>
                     </div>
-                    <input style={S.input} type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
+                    <input style={S.input} name="date" type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} />
                     <div style={S.btnGroup}>
                         {editingId && <button type="button" style={S.btnCancel} onClick={resetForm}>Cancel</button>}
                         <button style={S.btnSubmit} type="submit" disabled={loading}>{loading ? "Saving..." : editingId ? "Update" : "Add Income"}</button>

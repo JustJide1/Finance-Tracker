@@ -1,4 +1,4 @@
-import { useState, useCallback, memo } from "react";
+import { useState, useCallback, memo, useEffect } from "react";
 import { useTransactions } from "../hooks/useTransactions";
 import { useAI } from "../hooks/useAI";
 import { useToast } from "./Toast";
@@ -48,6 +48,34 @@ const S = {
         cursor: "pointer",
         minWidth: 80,
         fontFamily: "inherit",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: "8px",
+        transition: "opacity 0.15s ease",
+    },
+    btnLoading: {
+        opacity: 0.85,
+        cursor: "not-allowed",
+    },
+    spinner: {
+        width: 15,
+        height: 15,
+        flexShrink: 0,
+    },
+    inputLoading: {
+        opacity: 0.6,
+    },
+    srOnly: {
+        position: "absolute",
+        width: 1,
+        height: 1,
+        padding: 0,
+        margin: -1,
+        overflow: "hidden",
+        clip: "rect(0,0,0,0)",
+        whiteSpace: "nowrap",
+        border: 0,
     },
     examples: { display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" },
     examplesLabel: { fontSize: 12, color: "#9CA3AF" },
@@ -118,6 +146,37 @@ const CONFIDENCE_STYLES = {
     high: { ...S.confidenceBadge, background: "rgba(45,106,79,0.10)", color: "#2D6A4F" },
     medium: { ...S.confidenceBadge, background: "rgba(217,119,6,0.10)", color: "#D97706" },
     low: { ...S.confidenceBadge, background: "rgba(220,38,38,0.08)", color: "#DC2626" },
+};
+
+const SPINNER_KEYFRAMES = `
+@keyframes qa-spin {
+  to { transform: rotate(360deg); }
+}
+`;
+
+let _spinnerStyleInjected = false;
+function injectSpinnerStyle() {
+    if (_spinnerStyleInjected) return;
+    _spinnerStyleInjected = true;
+    const el = document.createElement("style");
+    el.textContent = SPINNER_KEYFRAMES;
+    document.head.appendChild(el);
+}
+
+const SpinnerIcon = () => {
+    useEffect(() => { injectSpinnerStyle(); }, []);
+    return (
+        <svg
+            style={{ ...S.spinner, animation: "qa-spin 0.75s linear infinite" }}
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+            focusable="false"
+        >
+            <circle cx="12" cy="12" r="9" stroke="rgba(255,255,255,0.35)" strokeWidth="3" />
+            <path d="M12 3a9 9 0 0 1 9 9" stroke="#ffffff" strokeWidth="3" strokeLinecap="round" />
+        </svg>
+    );
 };
 
 const ExampleChip = memo(({ text, onClick }) => {
@@ -222,17 +281,33 @@ function QuickAdd({ onSuccess }) {
                 </div>
             </div>
 
+            <div aria-live="polite" aria-atomic="true" style={S.srOnly}>
+                {parsing ? "Analyzing your transaction, please wait…" : ""}
+            </div>
+
             <form onSubmit={handleParse} style={S.form}>
                 <input
-                    style={S.input}
+                    style={parsing ? { ...S.input, ...S.inputLoading } : S.input}
+                    name="entry"
                     type="text"
                     placeholder='e.g., "Spent 1k on food today"'
                     value={input}
                     onChange={handleChangeInput}
                     disabled={parsing}
+                    aria-disabled={parsing}
                 />
-                <button style={S.btn} type="submit" disabled={parsing}>
-                    {parsing ? "Parsing..." : "Add"}
+                <button
+                    style={parsing ? { ...S.btn, ...S.btnLoading } : S.btn}
+                    type="submit"
+                    disabled={parsing}
+                    aria-label={parsing ? "Analyzing transaction…" : "Add transaction"}
+                >
+                    {parsing ? (
+                        <>
+                            <SpinnerIcon />
+                            Analyzing…
+                        </>
+                    ) : "Add"}
                 </button>
             </form>
 

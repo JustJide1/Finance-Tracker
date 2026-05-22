@@ -4,6 +4,28 @@ import { authService } from "../api/authService";
 import useAuthStore from "../store/authStore";
 import { useToast } from "../components/Toast";
 
+const API_URL = import.meta.env.VITE_API_URL ?? "http://localhost:5000";
+
+function GoogleSignInButton() {
+    const [loading, setLoading] = useState(false);
+    const handleClick = () => {
+        setLoading(true);
+        window.location.href = `${API_URL}/api/auth/google`;
+    };
+    return (
+        <button onClick={handleClick} disabled={loading} style={{ ...S.googleBtn, opacity: loading ? 0.75 : 1 }}>
+            {/* Official Google G icon */}
+            <svg width="18" height="18" viewBox="0 0 18 18" style={{ flexShrink: 0 }}>
+                <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
+                <path fill="#34A853" d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332A8.997 8.997 0 0 0 9 18z"/>
+                <path fill="#FBBC05" d="M3.964 10.71A5.41 5.41 0 0 1 3.682 9c0-.593.102-1.17.282-1.71V4.958H.957A8.996 8.996 0 0 0 0 9c0 1.452.348 2.827.957 4.042l3.007-2.332z"/>
+                <path fill="#EA4335" d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z"/>
+            </svg>
+            {loading ? "Redirecting…" : "Continue with Google"}
+        </button>
+    );
+}
+
 export default function Auth() {
     const [tab, setTab] = useState("login");
     const [form, setForm] = useState({ firstName: "", lastName: "", email: "", password: "" });
@@ -98,6 +120,14 @@ export default function Auth() {
                                     {t === "login" ? "Sign in" : "Register"}
                                 </button>
                             ))}
+                        </div>
+
+                        <GoogleSignInButton />
+
+                        <div style={S.divider}>
+                            <div style={S.dividerLine} />
+                            <span style={S.dividerText}>or</span>
+                            <div style={S.dividerLine} />
                         </div>
 
                         {tab === "register" && (
@@ -256,4 +286,18 @@ const S = {
     },
     footer: { textAlign: "center", fontSize: 13, color: "rgba(241,245,249,0.4)", marginTop: 20 },
     link:   { color: "#A8D5A2", fontWeight: 500, cursor: "pointer" },
+
+    googleBtn: {
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        width: "100%", height: 44, padding: "0 16px",
+        background: "#fff", color: "#1f1f1f",
+        border: "1px solid #dadce0", borderRadius: 10,
+        fontSize: 14, fontWeight: 500, cursor: "pointer",
+        fontFamily: "inherit", marginBottom: 4,
+        boxShadow: "0 1px 3px rgba(0,0,0,0.12)",
+        transition: "box-shadow 0.15s",
+    },
+    divider: { display: "flex", alignItems: "center", gap: 10, margin: "12px 0" },
+    dividerLine: { flex: 1, height: 1, background: "rgba(255,255,255,0.1)" },
+    dividerText: { fontSize: 12, color: "rgba(241,245,249,0.35)", whiteSpace: "nowrap" },
 };

@@ -64,12 +64,12 @@ export default function Budgets() {
             <div style={S.card}>
                 <h3 style={S.cardTitle}>{editingId ? "Edit Budget" : "Add Budget"}</h3>
                 <form style={S.form} onSubmit={handleSubmit}>
-                    <select style={S.input} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} disabled={!!editingId}>
+                    <select style={S.input} name="category" value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} disabled={!!editingId}>
                         <option value="">Select category</option>
                         {CATEGORIES.map((cat) => <option key={cat} value={cat}>{cat}</option>)}
                     </select>
-                    <input style={S.input} type="number" placeholder="Amount (₦)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
-                    <select style={S.input} value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}>
+                    <input style={S.input} name="amount" type="number" placeholder="Amount (₦)" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+                    <select style={S.input} name="period" value={form.period} onChange={(e) => setForm({ ...form, period: e.target.value })}>
                         <option value="monthly">Monthly</option>
                         <option value="weekly">Weekly</option>
                     </select>

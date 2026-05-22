@@ -150,6 +150,7 @@ EXTRACTION RULES:
 
 3. CATEGORY: Choose the BEST match from this list ONLY:
    ${CATEGORIES.join(", ")}
+   - Allowance: pocket money, allowance, upkeep money, feeding allowance, monthly allowance, stipend
    - Family Support: money sent to family, supporting parents/siblings, remittance
    - Personal Care: haircut, salon, spa, grooming, skincare, cosmetics, barbing
 
@@ -196,6 +197,9 @@ Output: {"type":"expense","amount":10000,"category":"Family Support","descriptio
 
 Input: "Haircut 3k"
 Output: {"type":"expense","amount":3000,"category":"Personal Care","description":"Haircut","date":"${today}","confidence":"high","missingFields":[]}
+
+Input: "Got allowance 5k"
+Output: {"type":"income","amount":5000,"category":"Allowance","description":"Allowance received","date":"${today}","confidence":"high","missingFields":[]}
 
 Input: "Bought stuff"
 Output: {"type":"expense","amount":0,"category":"Other","description":"Unspecified purchase","date":"${today}","confidence":"low","missingFields":["amount","specific category","description"]}
@@ -358,6 +362,7 @@ Now parse this input:
         else if (/invest|stock|crypto|savings/.test(lower)) category = "Investment";
         else if (/amazon|jumia|konga|shopping|clothes/.test(lower)) category = "Shopping";
         else if (/mum|mom|dad|father|mother|parent|sibling|brother|sister|family|sent to|send to|support/.test(lower)) category = "Family Support";
+        else if (/allowance|pocket money|upkeep|feeding allowance|stipend/.test(lower)) category = "Allowance";
         else if (/salon|barber|haircut|spa|grooming|skincare|beauty|personal care|cosmetics|manicure|pedicure|barbing/.test(lower)) category = "Personal Care";
 
         const missingFields = [];

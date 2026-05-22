@@ -20,8 +20,9 @@ function AIInsights() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                     <h3 style={S.title}>AI Insights</h3>
                     {hasLoaded && (
-                        <select 
-                            value={period} 
+                        <select
+                            name="period"
+                            value={period}
                             onChange={(e) => {
                                 setPeriod(e.target.value);
                                 fetchAIData(e.target.value);

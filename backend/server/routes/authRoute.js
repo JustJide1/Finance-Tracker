@@ -8,6 +8,8 @@ const {
     updateProfile,
     changePassword,
     deleteAccount,
+    googleAuth,
+    googleCallback,
 } = require("../controllers/authController");
 const {
     validate,
@@ -21,6 +23,10 @@ const {
 // Public routes
 router.post("/register", registerValidators, validate, register);
 router.post("/login", loginValidators, validate, login);
+
+// Google OAuth routes (authLimiter applied at the router level in index.js)
+router.get("/google", googleAuth);
+router.get("/google/callback", googleCallback);
 
 // Protected routes
 router.get("/profile", authMiddleware, getProfile);

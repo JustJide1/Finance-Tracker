@@ -136,11 +136,12 @@ export default function TransactionPage({ type }) {
             <div style={S.card}>
                 <h3 style={S.cardTitle}>{editingId ? cfg.editTitle : cfg.addTitle}</h3>
                 <form onSubmit={handleSubmit} style={S.form}>
-                    <input style={S.input} type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} />
-                    <input style={S.input} type="text" placeholder="Description" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
+                    <input style={S.input} name="amount" type="number" placeholder="Amount" value={form.amount} onChange={(e) => setForm(f => ({ ...f, amount: e.target.value }))} />
+                    <input style={S.input} name="description" type="text" placeholder="Description" value={form.description} onChange={(e) => setForm(f => ({ ...f, description: e.target.value }))} onBlur={() => { if (form.description && !form.category) handleSuggestCategory(); }} />
                     <div style={S.categoryWrapper}>
                         <input
                             style={{ ...S.input, paddingRight: 40 }}
+                            name="category"
                             type="text"
                             placeholder={suggesting ? "AI is categorising..." : "Category"}
                             value={form.category}
@@ -151,7 +152,7 @@ export default function TransactionPage({ type }) {
                             {suggesting ? "..." : "AI"}
                         </button>
                     </div>
-                    <input style={S.input} type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
+                    <input style={S.input} name="date" type="date" value={form.date} onChange={(e) => setForm(f => ({ ...f, date: e.target.value }))} />
                     <div style={{ ...S.btnGroup, gridColumn: "1 / -1" }}>
                         {editingId && <button type="button" style={S.btnCancel} onClick={resetForm}>Cancel</button>}
                         <button style={{ ...S.btnSubmit, background: cfg.submitBg }} type="submit" disabled={loadingTx}>

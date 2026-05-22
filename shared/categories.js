@@ -9,6 +9,7 @@ const CATEGORIES = [
     "Investment",
     "Salary",
     "Business",
+    "Allowance",
     "Gifts",
     "Family Support",
     "Personal Care",

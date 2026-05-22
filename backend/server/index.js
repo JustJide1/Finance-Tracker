@@ -2,13 +2,13 @@ const express = require("express");
 const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
+const cookieParser = require("cookie-parser");
 const dotenv = require("dotenv");
 const mongoose = require("mongoose");
 const connectDB = require("./config/db");
 const { processRecurring } = require("./services/recurringService");
 
 dotenv.config();
-connectDB();
 
 const app = express();
 
@@ -30,6 +30,7 @@ process.on("uncaughtException", (err) => {
 // ── Core middleware ───────────────────────────────────────────────────────────
 app.use(helmet());
 app.use(express.json());
+app.use(cookieParser());
 app.use(cors({
     origin: process.env.CLIENT_URL,
     credentials: true,
@@ -82,23 +83,29 @@ app.use((err, req, res, next) => { // eslint-disable-line no-unused-vars
 
 // ── Server startup ────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
 
-    // Run recurring transactions every hour
-    processRecurring().catch(err => console.error("[recurringService startup]", err));
-    const recurringInterval = setInterval(
-        () => processRecurring().catch(err => console.error("[recurringService interval]", err)),
-        60 * 60 * 1000,
-    );
+const startServer = async () => {
+    await connectDB();
+    app.listen(PORT, () => {
+        console.log(`Server running on port ${PORT}`);
 
-    async function shutdown(signal) {
-        console.log(`${signal} received — shutting down gracefully`);
-        clearInterval(recurringInterval);
-        await mongoose.connection.close();
-        process.exit(0);
-    }
+        // Run recurring transactions every hour
+        processRecurring().catch(err => console.error("[recurringService startup]", err));
+        const recurringInterval = setInterval(
+            () => processRecurring().catch(err => console.error("[recurringService interval]", err)),
+            60 * 60 * 1000,
+        );
 
-    process.on("SIGTERM", () => shutdown("SIGTERM"));
-    process.on("SIGINT",  () => shutdown("SIGINT"));
-});
+        async function shutdown(signal) {
+            console.log(`${signal} received — shutting down gracefully`);
+            clearInterval(recurringInterval);
+            await mongoose.connection.close();
+            process.exit(0);
+        }
+
+        process.on("SIGTERM", () => shutdown("SIGTERM"));
+        process.on("SIGINT",  () => shutdown("SIGINT"));
+    });
+};
+
+startServer();

@@ -62,11 +62,12 @@ function is429(err) {
     );
 }
 
-/** Returns true when the error looks like an HTTP 503 / service unavailable. */
+/** Returns true when the error looks like an HTTP 503 / service unavailable, or a network-level fetch failure. */
 function is503(err) {
     return (
         err?.status === 503 ||
-        /503|service.?unavailable/i.test(err?.message ?? "")
+        /503|service.?unavailable|fetch.?failed/i.test(err?.message ?? "") ||
+        (err?.cause && ["ECONNRESET", "ETIMEDOUT", "ENOTFOUND", "EAI_AGAIN", "UND_ERR_SOCKET"].includes(err.cause.code))
     );
 }
 

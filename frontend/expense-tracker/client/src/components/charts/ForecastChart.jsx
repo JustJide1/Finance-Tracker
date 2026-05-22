@@ -26,7 +26,10 @@ function DarkTooltip({ active, payload, label }) {
         <div style={{
             background: "#1A3C2E",
             borderRadius: 8,
-            padding: "8px 12px",
+            paddingTop: 8,
+            paddingRight: 12,
+            paddingBottom: 8,
+            paddingLeft: 12,
             fontSize: 12,
             color: "#fff",
             boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -51,7 +54,7 @@ export default function ForecastChart({ data, loading }) {
 
     if (loading) {
         return (
-            <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "8px 0", height: 180, justifyContent: 'center' }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 8, paddingRight: 0, paddingBottom: 8, paddingLeft: 0, height: 180, justifyContent: 'center' }}>
                 <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "100%", animation: "shimmer 1.5s infinite" }} />
                 <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "80%", animation: "shimmer 1.5s infinite" }} />
                 <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "90%", animation: "shimmer 1.5s infinite" }} />

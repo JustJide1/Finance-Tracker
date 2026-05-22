@@ -1,9 +1,104 @@
 const User = require("../models/user");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const { OAuth2Client } = require("google-auth-library");
+const crypto = require("crypto");
 
 const generateToken = (userId) =>
     jwt.sign({ id: userId }, process.env.JWT_SECRET, { expiresIn: "7d" });
+
+// ── Google OAuth ──────────────────────────────────────────────────────────────
+
+const oauthClient = new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_CLIENT_SECRET,
+    process.env.GOOGLE_REDIRECT_URI,
+);
+
+const CIPHER_ALGO = "aes-256-cbc";
+
+const encryptToken = (plaintext) => {
+    const iv  = crypto.randomBytes(16);
+    const key = Buffer.from(process.env.ENCRYPTION_KEY, "hex");
+    const cipher = crypto.createCipheriv(CIPHER_ALGO, key, iv);
+    const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+    return `${iv.toString("hex")}:${encrypted.toString("hex")}`;
+};
+
+exports.googleAuth = (req, res) => {
+    const state = crypto.randomBytes(16).toString("hex");
+
+    const url = oauthClient.generateAuthUrl({
+        access_type: "offline",
+        prompt: "consent",
+        scope: ["openid", "profile", "email"],
+        state,
+    });
+
+    // Store state in a short-lived httpOnly cookie for CSRF validation on callback
+    res.cookie("oauth_state", state, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax",        // must be 'lax' — Google redirect strips 'strict' cookies
+        maxAge: 10 * 60 * 1000, // 10 minutes
+    });
+
+    res.redirect(url);
+};
+
+exports.googleCallback = async (req, res) => {
+    const { code, state } = req.query;
+    const storedState = req.cookies?.oauth_state;
+
+    if (!state || state !== storedState) {
+        return res.redirect(`${process.env.CLIENT_URL}/?error=invalid_state`);
+    }
+    res.clearCookie("oauth_state");
+
+    try {
+        const { tokens } = await oauthClient.getToken(code);
+
+        const ticket = await oauthClient.verifyIdToken({
+            idToken: tokens.id_token,
+            audience: process.env.GOOGLE_CLIENT_ID,
+        });
+        const { sub: googleId, email, name, picture } = ticket.getPayload();
+
+        const parts = (name || "").trim().split(/\s+/);
+        const firstName = parts[0] || "";
+        const lastName  = parts.slice(1).join(" ") || "";
+
+        // Link to existing account by googleId, or fall back to matching email
+        let user = await User.findOne({ $or: [{ googleId }, { email }] });
+        if (user) {
+            user.googleId = googleId;
+            user.avatar   = picture;
+        } else {
+            user = new User({ googleId, email, firstName, lastName, avatar: picture, provider: "google" });
+        }
+
+        // Encrypt and persist refresh token when Google issues one
+        if (tokens.refresh_token && process.env.ENCRYPTION_KEY) {
+            user.googleRefreshToken = encryptToken(tokens.refresh_token);
+        }
+
+        await user.save();
+
+        const token = generateToken(user._id);
+        const redirectParams = new URLSearchParams({
+            token,
+            id:        user._id.toString(),
+            firstName: user.firstName || firstName,
+            email:     user.email,
+            avatar:    picture || "",
+        });
+
+        res.redirect(`${process.env.CLIENT_URL}/auth/callback?${redirectParams}`);
+    } catch (err) {
+        console.error("[googleCallback]", err);
+        res.redirect(`${process.env.CLIENT_URL}/?error=oauth_failed`);
+    }
+};
 
 exports.register = async (req, res) => {
     const { firstName, lastName, email, password } = req.body;

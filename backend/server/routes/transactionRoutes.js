@@ -10,6 +10,7 @@ const {
     getStats,
     deleteAllExpenses,
     deleteAllIncome,
+    getCategoryBreakdown,
 } = require("../controllers/transactionController");
 const {
     validate,
@@ -22,6 +23,7 @@ router.use(authMiddleware);
 
 router.get("/", getTransactions);
 router.get("/stats", getStats);
+router.get("/category-breakdown", getCategoryBreakdown);
 router.delete("/expenses/all", deleteAllExpenses);
 router.delete("/income/all", deleteAllIncome);
 router.get("/:id", getTransaction);

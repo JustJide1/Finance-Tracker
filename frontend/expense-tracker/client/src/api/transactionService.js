@@ -33,5 +33,9 @@ export const transactionService = {
     deleteAllIncome: async () => {
         const response = await axios.delete('/transactions/income/all');
         return response.data;
-    }
+    },
+    getCategoryBreakdown: async () => {
+        const response = await axios.get('/transactions/category-breakdown');
+        return response.data; // { data: [{ category, amount, percentage }], total }
+    },
 };

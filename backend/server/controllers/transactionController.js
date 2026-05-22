@@ -2,6 +2,7 @@ const mongoose = require("mongoose");
 const Transaction = require("../models/Transaction");
 const Budget = require("../models/Budget");
 const CategoryCorrection = require("../models/CategoryCorrection");
+const Insight = require("../models/Insight");
 const { invalidate: invalidateCorrectionCache } = require("../utils/correctionCache");
 
 // Get transactions — supports ?type=expense|income &category= &search= &startDate= &endDate= &page= &limit=
@@ -209,6 +210,7 @@ exports.deleteAllExpenses = async (req, res) => {
             userId: req.user.id,
             type: "expense",
         });
+        await Insight.deleteMany({ userId: req.user.id });
         res.json({ message: "All expenses deleted", deletedCount: result.deletedCount });
     } catch (err) {
         res.status(500).json({ message: "Server error" });
@@ -222,7 +224,33 @@ exports.deleteAllIncome = async (req, res) => {
             userId: req.user.id,
             type: "income",
         });
+        await Insight.deleteMany({ userId: req.user.id });
         res.json({ message: "All income deleted", deletedCount: result.deletedCount });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+// Get expense breakdown by category — top 8 by total amount
+exports.getCategoryBreakdown = async (req, res) => {
+    try {
+        const userId = new mongoose.Types.ObjectId(req.user.id);
+
+        const rows = await Transaction.aggregate([
+            { $match: { userId, type: "expense" } },
+            { $group: { _id: "$category", total: { $sum: "$amount" } } },
+            { $sort: { total: -1 } },
+            { $limit: 8 },
+        ]);
+
+        const grandTotal = rows.reduce((s, r) => s + r.total, 0);
+        const data = rows.map((r) => ({
+            category: r._id,
+            amount: r.total,
+            percentage: grandTotal > 0 ? Math.round((r.total / grandTotal) * 100) : 0,
+        }));
+
+        res.json({ data, total: grandTotal });
     } catch (err) {
         res.status(500).json({ message: "Server error" });
     }
