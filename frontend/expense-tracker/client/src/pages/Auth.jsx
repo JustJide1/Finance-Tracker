@@ -42,8 +42,17 @@ export default function Auth() {
         }
         if (!form.email)    return toast.error("Email is required");
         if (!form.password) return toast.error("Password is required");
-        if (form.password.length < 8) return toast.error("Password must be at least 8 characters");
         if (!/\S+@\S+\.\S+/.test(form.email)) return toast.error("Invalid email format");
+
+        if (tab === "register") {
+            if (form.password.length < 8)       return toast.error("Password must be at least 8 characters");
+            if (!/[A-Z]/.test(form.password))   return toast.error("Password must contain an uppercase letter");
+            if (!/[a-z]/.test(form.password))   return toast.error("Password must contain a lowercase letter");
+            if (!/\d/.test(form.password))      return toast.error("Password must contain a number");
+            if (!/[^A-Za-z0-9]/.test(form.password)) return toast.error("Password must contain a special character (e.g. @, #, !)");
+        } else {
+            if (form.password.length < 8) return toast.error("Password must be at least 8 characters");
+        }
 
         setLoading(true);
         try {
@@ -55,7 +64,11 @@ export default function Auth() {
             toast.success(tab === "login" ? `Welcome back, ${data.user.firstName}!` : "Account created!");
             navigate("/dashboard");
         } catch (err) {
-            toast.error(err.response?.data?.message || "Something went wrong");
+            const msg =
+                err.response?.data?.message ||
+                err.response?.data?.errors?.[0]?.msg ||
+                (err.request ? "Cannot reach the server — is the backend running?" : "Something went wrong");
+            toast.error(msg);
         } finally {
             setLoading(false);
         }
