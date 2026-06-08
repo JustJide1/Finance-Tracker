@@ -11,6 +11,8 @@ import { useAI } from "../hooks/useAI";
 import QuickAdd from "./QuickAdd";
 import ForecastChart from "./charts/ForecastChart";
 import ExpenseBreakdownChart from "./charts/ExpenseBreakdownChart";
+import AccuracyCard from "./AccuracyCard";
+import ForecastCard from "./ForecastCard";
 
 /* ── Dark tooltip for all charts ─────────────────────────────────────────── */
 const DarkTooltip = memo(function DarkTooltip({ active, payload, label }) {
@@ -474,6 +476,9 @@ export default function DashboardHome() {
                 </div>
             </div>
 
+            {/* ── Spending Forecast (category-level, full-width) ── */}
+            <ForecastCard />
+
             {/* ── Row 3 ── */}
             <div style={S.row3} className="ft-row3">
                 {/* Expense Breakdown pie chart */}
@@ -518,6 +523,9 @@ export default function DashboardHome() {
                         )}
                     </div>
                 </div>
+
+                {/* AI Accuracy */}
+                <AccuracyCard />
 
                 {/* Activity area chart */}
                 <div style={S.card}>
@@ -596,7 +604,7 @@ const S = {
 
     row1: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 14 },
     row2: { display: "grid", gridTemplateColumns: "2fr 1.5fr", gap: 14 },
-    row3: { display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr", gap: 14 },
+    row3: { display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1fr", gap: 14 },
 
     card: {
         background: "#FFFFFF",

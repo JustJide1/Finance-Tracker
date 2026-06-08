@@ -1,5 +1,6 @@
 const Transaction = require("../models/Transaction");
 const Insight = require("../models/Insight");
+const InsightHistory = require("../models/InsightHistory");
 const CategoryCorrection = require("../models/CategoryCorrection");
 const { generate, QUEUE_FULL_MSG, QUOTA_EXCEEDED_MSG } = require("../utils/geminiLimiter");
 const { getRecentCorrections } = require("../utils/correctionCache");
@@ -352,6 +353,12 @@ exports.getInsights = async (req, res) => {
             { upsert: true, returnDocument: 'after' }
         );
 
+        try {
+            await InsightHistory.create({ userId, period, insights, generatedAt: new Date() });
+        } catch (histErr) {
+            console.error("Failed to save insight history:", histErr);
+        }
+
         res.json({ insights });
     } catch (err) {
         console.error("Failed to generate insights:", err);
@@ -366,6 +373,21 @@ exports.getInsights = async (req, res) => {
             return res.json({ insights: stale.insights, cached: true, stale: true });
         }
         res.status(500).json({ message: "Failed to generate insights" });
+    }
+};
+
+// GET /api/ai/insights/history
+exports.getInsightHistory = async (req, res) => {
+    try {
+        const history = await InsightHistory.find({ userId: req.user.id })
+            .sort({ generatedAt: -1 })
+            .limit(15)
+            .select("period insights generatedAt -_id")
+            .lean();
+        res.json({ history });
+    } catch (err) {
+        console.error("Failed to fetch insight history:", err);
+        res.status(500).json({ message: "Failed to fetch insight history" });
     }
 };
 
@@ -460,24 +482,87 @@ exports.getForecast = async (req, res) => {
         const userId = req.user.id;
         const transactions = await Transaction.find({ userId, type: "expense" }).lean();
 
-        if (!transactions.length) {
-            return res.json({ forecastData: [], insight: "Not enough data to generate a forecast." });
+        const NO_DATA = {
+            forecastData: [],
+            insight: "Add more transactions over multiple months to generate a forecast.",
+            months: [],
+        };
+
+        if (!transactions.length) return res.json(NO_DATA);
+
+        // Group totals by "YYYY-MM" and category
+        const byMonth = {};
+        for (const t of transactions) {
+            const d = new Date(t.date);
+            const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
+            if (!byMonth[key]) byMonth[key] = {};
+            byMonth[key][t.category] = (byMonth[key][t.category] || 0) + t.amount;
         }
 
-        const { forecastData, predictedAmount, history } = buildForecastData(transactions);
+        // Exclude the current in-progress month
+        const now = new Date();
+        const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+        const completedMonths = Object.keys(byMonth).filter(k => k !== currentKey).sort();
 
-        if (predictedAmount === null) {
-            return res.json({ forecastData, insight: "We need at least two months of data to make a reliable prediction." });
+        // Take the 3 most recent complete months (oldest → newest)
+        const recentMonths = completedMonths.slice(-3);
+
+        if (!recentMonths.length) return res.json(NO_DATA);
+
+        // Equal weighting for < 3 months, spec weights for exactly 3
+        const weightMap = {
+            1: [1.0],
+            2: [0.5, 0.5],
+            3: [0.20, 0.30, 0.50],
+        };
+        const weights = weightMap[recentMonths.length];
+
+        // Collect every category seen across the window
+        const allCategories = new Set(
+            recentMonths.flatMap(m => Object.keys(byMonth[m] || {}))
+        );
+
+        // Compute per-category weighted forecast
+        // recentMonths is sorted oldest→newest, so index 0 = m3 (oldest), last = m1 (most recent)
+        const forecastData = [];
+        for (const category of allCategories) {
+            const amounts = recentMonths.map(m => byMonth[m]?.[category] || 0);
+            const weighted = amounts.reduce((sum, amt, i) => sum + amt * weights[i], 0);
+            if (weighted <= 0) continue;
+
+            const len = recentMonths.length;
+            forecastData.push({
+                category,
+                forecastAmount: Math.round(weighted),
+                m1: amounts[len - 1],               // most recent
+                m2: len >= 2 ? amounts[len - 2] : 0, // middle
+                m3: len >= 3 ? amounts[0] : 0,        // oldest
+            });
         }
 
-        let insight = `Based on your recent spending, we project your expenses will be around ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })} next month.`;
+        forecastData.sort((a, b) => b.forecastAmount - a.forecastAmount);
 
-        const prompt = `A user has the following recent monthly expense totals (in NGN):
-${history.map(h => `${h.monthName}: ₦${h.amount.toLocaleString()}`).join("\n")}
+        const toLabel = (key) => {
+            const [y, m] = key.split("-").map(Number);
+            return new Date(y, m - 1, 1).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+        };
+        // months array is ordered oldest (m3) → most recent (m1)
+        const months = recentMonths.map(toLabel);
 
-The statistical forecast for next month is ₦${predictedAmount.toLocaleString(undefined, { maximumFractionDigits: 0 })}.
-Write a single, encouraging, and practical 1-sentence financial insight or tip about this trend for the user. Do not mention the exact word "statistical forecast". Focus on actionable advice.`;
+        if (!forecastData.length) return res.json({ ...NO_DATA, months });
 
+        // Build Gemini prompt
+        const top3 = forecastData.slice(0, 3);
+        const total = forecastData.reduce((s, c) => s + c.forecastAmount, 0);
+        const listLines = top3.map(c => `- ${c.category}: ₦${c.forecastAmount.toLocaleString()}`).join("\n");
+        const prompt =
+            `Top 3 spending categories predicted for next month:\n${listLines}\n` +
+            `Overall predicted total for next month: ₦${total.toLocaleString()}\n\n` +
+            `You are a financial advisor for a Nigerian university student. Based on this forecast, ` +
+            `write ONE practical sentence of financial advice. Keep it under 25 words. ` +
+            `Do not use the word 'forecast' or 'algorithm'. Focus on the highest-spend category.`;
+
+        let insight = `Your highest predicted spend is ${top3[0].category} — budget for it early to stay on track.`;
         try {
             const result = await generate(prompt);
             insight = result.response.text().trim();
@@ -485,7 +570,7 @@ Write a single, encouraging, and practical 1-sentence financial insight or tip a
             console.error("Gemini forecast insight error:", err.message);
         }
 
-        res.json({ forecastData, insight });
+        res.json({ forecastData, insight, months });
     } catch (err) {
         console.error("Forecast generation error:", err);
         res.status(500).json({ message: "Failed to generate forecast" });

@@ -157,19 +157,21 @@ exports.updateTransaction = async (req, res) => {
         }
 
         // Log category correction when user changes AI-suggested category
-        if (category && category !== transaction.category && transaction.aiSuggestedCategory) {
-            const effectiveOriginal = transaction.aiSuggestedCategory;
-            if (category !== effectiveOriginal) {
-                transaction.userOverrode = true;
-                await CategoryCorrection.create({
-                    userId: req.user.id,
-                    transactionId: transaction._id,
-                    description: transaction.description,
-                    originalCategory: effectiveOriginal,
-                    correctedCategory: category,
-                });
-                invalidateCorrectionCache(req.user.id);
-            }
+        if (
+            category &&
+            category !== transaction.category &&
+            transaction.aiSuggestedCategory !== null &&
+            category !== transaction.aiSuggestedCategory
+        ) {
+            transaction.userOverrode = true;
+            await CategoryCorrection.create({
+                userId: req.user.id,
+                transactionId: transaction._id,
+                description: transaction.description,
+                originalCategory: transaction.category,
+                correctedCategory: category,
+            });
+            invalidateCorrectionCache(req.user.id);
         }
 
         transaction.type = type || transaction.type;

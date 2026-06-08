@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/authMiddleware");
 const {
     suggestCategory,
     getInsights,
+    getInsightHistory,
     checkAnomalies,
     testGemini,
     listModels,
@@ -66,6 +67,7 @@ router.post("/parse-transaction", lightAiLimiter, parseTransactionValidators, va
 router.post("/categorize",        lightAiLimiter, suggestCategoryValidators, validate, suggestCategory);
 
 // Heavy AI endpoints — up to 3 Gemini calls, MongoDB aggregations, 24h cached
+router.get("/insights/history", getInsightHistory);
 router.get("/insights",  heavyAiLimiter, insightsValidators, validate, getInsights);
 router.get("/anomalies", heavyAiLimiter, checkAnomalies);
 router.get("/forecast",  heavyAiLimiter, getForecast);

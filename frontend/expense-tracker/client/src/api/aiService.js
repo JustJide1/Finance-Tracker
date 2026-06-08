@@ -30,4 +30,8 @@ export const aiService = {
         const response = await axios.get(`/ai/dashboard?period=${period}`);
         return response.data;
     },
+    getInsightHistory: async () => {
+        const response = await axios.get('/ai/insights/history');
+        return response.data;
+    },
 };
