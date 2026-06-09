@@ -59,7 +59,7 @@ exports.getTransaction = async (req, res) => {
 
 // Create transaction
 exports.createTransaction = async (req, res) => {
-    const { type, amount, category, description, date } = req.body;
+    const { type, amount, category, description, date, aiSuggestedCategory, aiConfidence, userOverrode } = req.body;
 
     try {
         // Validation
@@ -80,6 +80,9 @@ exports.createTransaction = async (req, res) => {
             category,
             description,
             date,
+            aiSuggestedCategory: aiSuggestedCategory ?? null,
+            aiConfidence: aiConfidence ?? null,
+            userOverrode: userOverrode ?? false,
         });
 
         let budgetAlert = null;
@@ -293,6 +296,32 @@ exports.getStats = async (req, res) => {
         const monthlyExpenses = agg?.monthlyExpenses ?? 0;
 
         res.json({ balance: totalIncome - totalExpenses, totalIncome, totalExpenses, monthlyExpenses });
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
+
+// PATCH /transactions/:id/confirm-category  { confirmed: true | false }
+exports.confirmCategory = async (req, res) => {
+    const { confirmed } = req.body;
+    if (typeof confirmed !== "boolean") {
+        return res.status(400).json({ message: "confirmed must be true or false" });
+    }
+    try {
+        const transaction = await Transaction.findOne({ _id: req.params.id, userId: req.user.id });
+        if (!transaction) return res.status(404).json({ message: "Transaction not found" });
+        if (!transaction.aiSuggestedCategory) {
+            return res.status(400).json({ message: "No AI suggestion to confirm on this transaction" });
+        }
+
+        transaction.aiConfirmed = confirmed;
+
+        if (!confirmed) {
+            transaction.userOverrode = true;
+        }
+
+        await transaction.save();
+        res.json({ aiConfirmed: transaction.aiConfirmed, userOverrode: transaction.userOverrode });
     } catch (err) {
         res.status(500).json({ message: "Server error" });
     }

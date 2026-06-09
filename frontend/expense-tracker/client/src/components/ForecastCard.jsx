@@ -35,7 +35,7 @@ function ForecastCard() {
                     <p style={S.subtitle}>Predicted next month by category</p>
                 </div>
                 <p style={S.empty}>
-                    Track expenses for 2+ months to unlock your spending forecast.
+                    Add some transactions to unlock your spending forecast.
                 </p>
             </div>
         );

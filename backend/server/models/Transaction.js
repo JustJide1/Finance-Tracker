@@ -44,6 +44,10 @@ const TransactionSchema = new mongoose.Schema({
         type: Boolean,
         default: false,
     },
+    aiConfirmed: {
+        type: Boolean,
+        default: null,
+    },
 }, { timestamps: true });
 
 // Compound indexes covering the most common query patterns

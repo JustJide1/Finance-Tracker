@@ -7,12 +7,14 @@ const CATEGORIES = [
     "Healthcare",
     "Education",
     "Investment",
+    "Savings",
     "Salary",
     "Business",
     "Allowance",
     "Gifts",
     "Family Support",
     "Personal Care",
+    "Personal Transfer",
     "Other"
 ];
 

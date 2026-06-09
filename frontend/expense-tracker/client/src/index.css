@@ -62,11 +62,6 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     }
 }
 
-@media (max-width: 900px) {
-    .form-panel-mobile-logo {
-        display: flex !important;
-    }
-}
 
 /* ── Keyboard focus ring (overrides inline outline:none) ───────────────── */
 :focus-visible {

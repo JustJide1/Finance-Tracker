@@ -153,6 +153,9 @@ EXTRACTION RULES:
    - Allowance: pocket money, allowance, upkeep money, feeding allowance, monthly allowance, stipend
    - Family Support: money sent to family, supporting parents/siblings, remittance
    - Personal Care: haircut, salon, spa, grooming, skincare, cosmetics, barbing
+   - Savings: money deliberately set aside (save, saved, savings account, piggybank, kuda savings, emergency fund, target savings, saving up) — NOT investment
+   - Investment: money put to work for returns (invest, stock, crypto, shares, mutual fund, bonds, real estate investment) — NOT savings
+   - Personal Transfer: paying someone back, settling a debt, money owed (paid [name], owe, owed, debt, refund to, transfer to [person], "for what I owe", "balance", "lend", "borrowed")
 
 4. DESCRIPTION: Create a clean, concise description (3-8 words). If currency was converted, include the original amount, e.g. "Groceries ($50 → ₦80,000)"
 
@@ -203,6 +206,12 @@ Output: {"type":"income","amount":5000,"category":"Allowance","description":"All
 
 Input: "Got 30k stipend from dad"
 Output: {"type":"income","amount":30000,"category":"Allowance","description":"Stipend from dad","date":"${today}","confidence":"high","missingFields":[]}
+
+Input: "Paid 1000 to Ayomide for something I owe him"
+Output: {"type":"expense","amount":1000,"category":"Personal Transfer","description":"Debt repayment to Ayomide","date":"${today}","confidence":"high","missingFields":[]}
+
+Input: "Transferred 5k to Tunde, he lent it to me last week"
+Output: {"type":"expense","amount":5000,"category":"Personal Transfer","description":"Repaid loan to Tunde","date":"${today}","confidence":"high","missingFields":[]}
 
 Input: "Bought stuff"
 Output: {"type":"expense","amount":0,"category":"Other","description":"Unspecified purchase","date":"${today}","confidence":"low","missingFields":["amount","specific category","description"]}
@@ -362,11 +371,13 @@ Now parse this input:
         else if (/hospital|pharmacy|doctor|clinic|drug|medicine/.test(lower)) category = "Healthcare";
         else if (/school|tuition|course|book|education/.test(lower)) category = "Education";
         else if (/salary|wages|payment|freelance/.test(lower)) category = "Salary";
-        else if (/invest|stock|crypto|savings/.test(lower)) category = "Investment";
+        else if (/\bsav(e|ed|ing|ings)\b|piggybank|emergency fund|target savings/.test(lower)) category = "Savings";
+        else if (/invest|stock|crypto|mutual fund|shares|bonds/.test(lower)) category = "Investment";
         else if (/amazon|jumia|konga|shopping|clothes/.test(lower)) category = "Shopping";
         else if (/mum|mom|dad|father|mother|parent|sibling|brother|sister|family|sent to|send to|support/.test(lower)) category = "Family Support";
         else if (/allowance|pocket money|upkeep|feeding allowance|stipend/.test(lower)) category = "Allowance";
         else if (/salon|barber|haircut|spa|grooming|skincare|beauty|personal care|cosmetics|manicure|pedicure|barbing/.test(lower)) category = "Personal Care";
+        else if (/\bowe(d|s)?\b|\bdebt\b|\blend\b|\blent\b|\bborrow(ed)?\b|paid .+ for|transfer to|refund to/.test(lower)) category = "Personal Transfer";
 
         const missingFields = [];
         if (!amount) missingFields.push("amount");

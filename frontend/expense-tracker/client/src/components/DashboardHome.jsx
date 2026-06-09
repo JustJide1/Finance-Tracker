@@ -227,6 +227,8 @@ export default function DashboardHome() {
     const [loadingInsights, setLoadingInsights] = useState(true);
     const [forecastState, setForecastState] = useState({ data: null, insight: null });
     const [loadingForecast, setLoadingForecast] = useState(true);
+    const [refreshingInsights, setRefreshingInsights] = useState(false);
+    const [anomalyDismissed, setAnomalyDismissed] = useState(false);
 
     useEffect(() => {
         const id = "dashboard-fintpay-styles";
@@ -243,10 +245,12 @@ export default function DashboardHome() {
             @media (max-width: 860px) {
                 .ft-row2 { grid-template-columns: 1fr !important; }
                 .ft-row3 { grid-template-columns: 1fr 1fr !important; }
+                .ft-insights-grid { grid-template-columns: 1fr !important; }
             }
             @media (max-width: 560px) {
                 .ft-row2 { grid-template-columns: 1fr !important; }
                 .ft-row3 { grid-template-columns: 1fr !important; }
+                .ft-insights-grid { grid-template-columns: 1fr !important; }
             }
         `;
         document.head.appendChild(el);
@@ -266,6 +270,7 @@ export default function DashboardHome() {
                 if (aiData) {
                     setInsightsData({ insights: aiData.insights || [], anomaly: aiData.anomaly });
                     setForecastState({ data: aiData.forecastData, insight: aiData.forecastInsight });
+                    setAnomalyDismissed(false);
                 }
                 setLoadingInsights(false);
                 setLoadingForecast(false);
@@ -274,6 +279,17 @@ export default function DashboardHome() {
         if (!loading) fetchAi();
         return () => { mounted = false; };
     }, [loading, getAIDashboard]);
+
+    const handleRefreshInsights = async () => {
+        setRefreshingInsights(true);
+        const aiData = await getAIDashboard('month', true);
+        if (aiData) {
+            setInsightsData({ insights: aiData.insights || [], anomaly: aiData.anomaly });
+            setForecastState({ data: aiData.forecastData, insight: aiData.forecastInsight });
+            setAnomalyDismissed(false);
+        }
+        setRefreshingInsights(false);
+    };
 
     const hasData = transactions.length > 0;
 
@@ -479,6 +495,50 @@ export default function DashboardHome() {
             {/* ── Spending Forecast (category-level, full-width) ── */}
             <ForecastCard />
 
+            {/* ── AI Insights (full-width) ── */}
+            <div style={S.card}>
+                <div style={S.cardHead}>
+                    <span style={S.cardTitle}>AI Insights</span>
+                    <button
+                        style={{ ...S.refreshBtn, ...(refreshingInsights ? S.refreshBtnDisabled : {}) }}
+                        onClick={handleRefreshInsights}
+                        disabled={refreshingInsights || loadingInsights}
+                        title="Refresh insights"
+                    >
+                        {refreshingInsights ? "Refreshing..." : "↺ Refresh"}
+                    </button>
+                </div>
+                {insightsData?.anomaly && !anomalyDismissed && (
+                    <div style={{ padding: "8px 12px", background: "rgba(217,119,6,0.1)", borderLeft: "3px solid #D97706", borderRadius: 4, fontSize: 12, color: "#92400E", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, marginBottom: 12 }}>
+                        <span><strong>Anomaly Detected:</strong> {insightsData.anomaly}</span>
+                        <button onClick={() => setAnomalyDismissed(true)} style={{ background: "none", border: "none", cursor: "pointer", color: "#92400E", fontSize: 14, lineHeight: 1, padding: 0, flexShrink: 0, opacity: 0.6 }} title="Dismiss">✕</button>
+                    </div>
+                )}
+                {loadingInsights ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="ft-insights-grid">
+                        {[100, 85, 92].map((w, i) => (
+                            <div key={i} style={{ padding: "14px 16px", background: "#F9FAFB", borderRadius: 10, border: "1px solid #E5E7EB" }}>
+                                <div style={{ height: 13, background: "#F3F4F6", borderRadius: 4, width: `${w}%`, marginBottom: 8 }} />
+                                <div style={{ height: 13, background: "#F3F4F6", borderRadius: 4, width: "70%" }} />
+                            </div>
+                        ))}
+                    </div>
+                ) : insightsData?.insights?.length > 0 ? (
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }} className="ft-insights-grid">
+                        {insightsData.insights.map((insight, idx) => (
+                            <div key={idx} style={{ display: "flex", gap: 10, padding: "14px 16px", background: "#F9FAFB", borderRadius: 10, border: "1px solid #E5E7EB", alignItems: "flex-start" }}>
+                                <span style={{ color: "#2D6A4F", flexShrink: 0, fontSize: 14, marginTop: 1 }}>✦</span>
+                                <span style={{ fontSize: 13, color: "#374151", lineHeight: 1.55 }}>{insight}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <p style={{ fontSize: 13, color: "#9CA3AF", textAlign: "center", padding: "1.5rem 0" }}>
+                        Not enough data for AI insights yet.
+                    </p>
+                )}
+            </div>
+
             {/* ── Row 3 ── */}
             <div style={S.row3} className="ft-row3">
                 {/* Expense Breakdown pie chart */}
@@ -487,41 +547,6 @@ export default function DashboardHome() {
                         <span style={S.cardTitle}>Expense Breakdown</span>
                     </div>
                     <ExpenseBreakdownChart transactions={transactions} />
-                </div>
-
-                {/* AI Insights */}
-                <div style={S.card}>
-                    <div style={S.cardHead}>
-                        <span style={S.cardTitle}>AI Insights</span>
-                    </div>
-                    <div style={{ height: 180, overflowY: "auto", paddingRight: 4 }} className="thin-scroll">
-                        {loadingInsights ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12, padding: "8px 0" }}>
-                                <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "100%", animation: "shimmer 1.5s infinite" }} />
-                                <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "80%", animation: "shimmer 1.5s infinite" }} />
-                                <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "90%", animation: "shimmer 1.5s infinite" }} />
-                                <div style={{ height: 14, background: "#F3F4F6", borderRadius: 4, width: "60%", animation: "shimmer 1.5s infinite" }} />
-                            </div>
-                        ) : insightsData && (insightsData.insights?.length > 0 || insightsData.anomaly) ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                                {insightsData.anomaly && (
-                                    <div style={{ padding: "8px 12px", background: "rgba(217,119,6,0.1)", borderLeft: "3px solid #D97706", borderRadius: 4, fontSize: 12, color: "#92400E" }}>
-                                        <strong>Anomaly Detected:</strong> {insightsData.anomaly}
-                                    </div>
-                                )}
-                                {insightsData.insights?.map((insight, idx) => (
-                                    <div key={idx} style={{ display: "flex", gap: 8, fontSize: 13, color: "#374151" }}>
-                                        <span style={{ color: "#2D6A4F", flexShrink: 0, marginTop: 1 }}>✦</span>
-                                        <span style={{ lineHeight: 1.5 }}>{insight}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <p style={{ fontSize: 13, color: "#9CA3AF", textAlign: "center", marginTop: 40 }}>
-                                Not enough data for AI insights yet.
-                            </p>
-                        )}
-                    </div>
                 </div>
 
                 {/* AI Accuracy */}
@@ -604,7 +629,7 @@ const S = {
 
     row1: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr 2fr", gap: 14 },
     row2: { display: "grid", gridTemplateColumns: "2fr 1.5fr", gap: 14 },
-    row3: { display: "grid", gridTemplateColumns: "1fr 1.5fr 1fr 1fr", gap: 14 },
+    row3: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 },
 
     card: {
         background: "#FFFFFF",
@@ -795,6 +820,10 @@ const S = {
         border: "1px solid rgba(45,106,79,0.2)",
         cursor: "pointer",
         fontFamily: "inherit",
+    },
+    refreshBtnDisabled: {
+        opacity: 0.5,
+        cursor: "not-allowed",
     },
     empty: { fontSize: 13, color: "#9CA3AF", textAlign: "center", padding: "2rem 0" },
     table: { width: "100%", borderCollapse: "collapse", minWidth: 480 },

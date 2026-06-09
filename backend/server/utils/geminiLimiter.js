@@ -247,7 +247,7 @@ const limiter = new GeminiLimiter({
 
 // ── Retry logic (runs inside a limiter slot) ──────────────────────────────────
 
-const MAX_RETRIES = 2;
+const MAX_RETRIES = 3;
 
 async function _attempt(prompt) {
     for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
@@ -268,17 +268,18 @@ async function _attempt(prompt) {
                 return _tryFallback(prompt);
             }
 
-            if (is503(err)) {
+            if (is503(err) || err?.isTimeout) {
                 if (attempt < MAX_RETRIES) {
-                    const waitMs = Math.pow(2, attempt) * 1_000 + jitter(500); // 2±0.5 s, 4±0.5 s
+                    const waitMs = Math.pow(2, attempt) * 1_000 + jitter(500); // 2±0.5 s, 4±0.5 s, 8±0.5 s
+                    const reason = err?.isTimeout ? "timeout" : "503";
                     console.warn(
-                        `⚠️  Gemini 503 (attempt ${attempt}/${MAX_RETRIES}) — ` +
+                        `⚠️  Gemini ${reason} (attempt ${attempt}/${MAX_RETRIES}) — ` +
                         `retrying in ${Math.round(waitMs)}ms…`
                     );
                     await sleep(waitMs);
                     continue;
                 }
-                console.warn("⚠️  Gemini 503 exhausted — trying fallback model…");
+                console.warn("⚠️  Gemini 503/timeout exhausted — trying fallback model…");
                 return _tryFallback(prompt);
             }
 
@@ -296,6 +297,11 @@ async function _tryFallback(prompt) {
         );
     } catch (err) {
         if (is429(err)) {
+            const quotaErr = new Error("ALL_QUOTA_EXCEEDED");
+            quotaErr.isQuotaError = true;
+            throw quotaErr;
+        }
+        if (err?.isTimeout) {
             const quotaErr = new Error("ALL_QUOTA_EXCEEDED");
             quotaErr.isQuotaError = true;
             throw quotaErr;

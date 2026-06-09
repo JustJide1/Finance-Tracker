@@ -38,4 +38,8 @@ export const transactionService = {
         const response = await axios.get('/transactions/category-breakdown');
         return response.data; // { data: [{ category, amount, percentage }], total }
     },
+    confirmCategory: async (id, confirmed) => {
+        const response = await axios.patch(`/transactions/${id}/confirm-category`, { confirmed });
+        return response.data;
+    },
 };

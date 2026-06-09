@@ -23,8 +23,9 @@ export default function AccuracyCard() {
 
     const {
         aiCategorized   = 0,
-        accepted        = 0,
-        corrected       = 0,
+        confirmed       = 0,
+        rejected        = 0,
+        pending         = 0,
         accuracyRate    = null,
         recentCorrections = [],
     } = data || {};
@@ -41,9 +42,9 @@ export default function AccuracyCard() {
         : circumference * (1 - accuracyRate / 100);
 
     const pills = [
-        { label: "AI-categorized", value: aiCategorized },
-        { label: "accepted",        value: accepted },
-        { label: "corrected",       value: corrected },
+        { label: "confirmed", value: confirmed, color: "#2D6A4F" },
+        { label: "rejected",  value: rejected,  color: "#DC2626" },
+        { label: "pending",   value: pending,   color: "#9CA3AF" },
     ];
 
     const corrections = recentCorrections.slice(0, 3);
@@ -85,14 +86,14 @@ export default function AccuracyCard() {
             </div>
 
             {accuracyRate === null && (
-                <p style={S.noData}>No data yet — add transactions to measure accuracy</p>
+                <p style={S.noData}>No reviews yet — confirm or reject AI suggestions on your transactions</p>
             )}
 
             {/* Stat pills */}
             <div style={S.pills}>
                 {pills.map(p => (
                     <div key={p.label} style={S.pill}>
-                        <span style={S.pillVal}>{p.value}</span>
+                        <span style={{ ...S.pillVal, color: p.color }}>{p.value}</span>
                         <span style={S.pillLbl}>{p.label}</span>
                     </div>
                 ))}

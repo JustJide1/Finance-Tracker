@@ -27,7 +27,7 @@ export default function TransactionPage({ type }) {
     const [pendingDeleteId, setPendingDeleteId] = useState(null);
     const toast = useToast();
 
-    const { transactions: allTransactions, loading: loadingTx, fetchTransactions, createTransaction, updateTransaction, deleteTransaction, deleteAllExpenses, deleteAllIncome } = useTransactions(type);
+    const { transactions: allTransactions, loading: loadingTx, fetchTransactions, createTransaction, updateTransaction, deleteTransaction, deleteAllExpenses, deleteAllIncome, confirmCategory } = useTransactions(type);
     const { suggestCategory: aiSuggestCategory, loading: suggesting } = useAI();
 
     useEffect(() => { fetchTransactions(); }, [fetchTransactions]);
@@ -191,6 +191,19 @@ export default function TransactionPage({ type }) {
                             <div key={t._id} style={itemStyle(t)}>
                                 <div style={S.itemLeft}>
                                     <div style={S.itemCategory}>{t.category}</div>
+                                    {t.aiSuggestedCategory && (
+                                        <div style={S.aiFeedbackRow}>
+                                            {t.aiConfirmed === null && !t.userOverrode ? (
+                                                <>
+                                                    <span style={S.aiLabel}>AI</span>
+                                                    <button style={S.btnThumbUp} title="Category is correct" onClick={() => confirmCategory(t._id, true)}>✓</button>
+                                                    <button style={S.btnThumbDown} title="Category is wrong" onClick={() => confirmCategory(t._id, false)}>✗</button>
+                                                </>
+                                            ) : t.aiConfirmed === true ? (
+                                                <span style={S.aiConfirmedBadge}>AI ✓</span>
+                                            ) : null}
+                                        </div>
+                                    )}
                                     <div style={S.itemDesc}>{t.description}</div>
                                     <div style={S.itemDate}>{new Date(t.date).toLocaleDateString()}</div>
                                 </div>
@@ -279,6 +292,11 @@ const S = {
     itemActions: { display: "flex", gap: "0.375rem" },
     btnEdit: { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid #E5E7EB", color: "#6B7280", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
     btnDelete: { fontSize: 12, padding: "4px 10px", background: "transparent", border: "1px solid rgba(220,38,38,0.25)", color: "#DC2626", borderRadius: 7, cursor: "pointer", fontFamily: "inherit" },
+    aiFeedbackRow: { display: "flex", alignItems: "center", gap: 4, marginTop: 3, marginBottom: 2 },
+    aiLabel: { fontSize: 10, fontWeight: 700, color: "#2D6A4F", background: "rgba(45,106,79,0.10)", border: "1px solid rgba(45,106,79,0.2)", borderRadius: 5, padding: "1px 5px", lineHeight: 1.5 },
+    btnThumbUp: { fontSize: 11, padding: "1px 7px", background: "rgba(45,106,79,0.08)", border: "1px solid rgba(45,106,79,0.25)", color: "#2D6A4F", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.5, fontWeight: 700 },
+    btnThumbDown: { fontSize: 11, padding: "1px 7px", background: "rgba(220,38,38,0.06)", border: "1px solid rgba(220,38,38,0.2)", color: "#DC2626", borderRadius: 6, cursor: "pointer", fontFamily: "inherit", lineHeight: 1.5, fontWeight: 700 },
+    aiConfirmedBadge: { fontSize: 10, fontWeight: 700, color: "#2D6A4F", background: "rgba(45,106,79,0.10)", border: "1px solid rgba(45,106,79,0.2)", borderRadius: 5, padding: "1px 6px", lineHeight: 1.5 },
     overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" },
     dialog: { background: "#FFFFFF", border: "1px solid #E5E7EB", borderRadius: 18, padding: "2rem 2.25rem", maxWidth: 380, width: "90%", textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.12)" },
     dialogIcon: { fontSize: 36, marginBottom: "0.75rem" },

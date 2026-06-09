@@ -11,6 +11,7 @@ const {
     deleteAllExpenses,
     deleteAllIncome,
     getCategoryBreakdown,
+    confirmCategory,
 } = require("../controllers/transactionController");
 const {
     validate,
@@ -29,6 +30,7 @@ router.delete("/income/all", deleteAllIncome);
 router.get("/:id", getTransaction);
 router.post("/", createTransactionValidators, validate, createTransaction);
 router.put("/:id", updateTransactionValidators, validate, updateTransaction);
+router.patch("/:id/confirm-category", confirmCategory);
 router.delete("/:id", deleteTransaction);
 
 module.exports = router;

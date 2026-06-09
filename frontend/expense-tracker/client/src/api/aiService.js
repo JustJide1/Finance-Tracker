@@ -26,8 +26,9 @@ export const aiService = {
         return response.data;
     },
     // Returns { insights, anomaly, forecastData, forecastInsight } in one request
-    getDashboard: async (period = 'month') => {
-        const response = await axios.get(`/ai/dashboard?period=${period}`);
+    getDashboard: async (period = 'month', refresh = false) => {
+        const url = `/ai/dashboard?period=${period}${refresh ? '&refresh=true' : ''}`;
+        const response = await axios.get(url);
         return response.data;
     },
     getInsightHistory: async () => {

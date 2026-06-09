@@ -65,10 +65,10 @@ export const useAI = () => {
     }, []);
 
     // Single request replacing the separate getInsights + getAnomalies + forecastSpending calls
-    const getAIDashboard = useCallback(async (period = 'month') => {
+    const getAIDashboard = useCallback(async (period = 'month', refresh = false) => {
         setLoading(true);
         try {
-            const data = await aiService.getDashboard(period);
+            const data = await aiService.getDashboard(period, refresh);
             return data; // { insights, anomaly, forecastData, forecastInsight }
         } catch (err) {
             console.error("Failed to load AI dashboard", err);

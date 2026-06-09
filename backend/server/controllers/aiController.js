@@ -101,7 +101,9 @@ const categorizeByRules = (description) => {
         return "Education";
     if (/salary|wages|payment|income|freelance|contract/.test(desc))
         return "Salary";
-    if (/invest|stock|crypto|savings|deposit/.test(desc))
+    if (/\bsav(e|ed|ing|ings)\b|piggybank|emergency fund|target savings/.test(desc))
+        return "Savings";
+    if (/invest|stock|crypto|mutual fund|shares|bonds/.test(desc))
         return "Investment";
     if (/amazon|jumia|konga|shopping|clothes|fashion|shoe/.test(desc))
         return "Shopping";
@@ -109,6 +111,8 @@ const categorizeByRules = (description) => {
         return "Family Support";
     if (/salon|barber|haircut|spa|grooming|skincare|beauty|personal care|cosmetics|manicure|pedicure|barbing/.test(desc))
         return "Personal Care";
+    if (/\bowe(d|s)?\b|\bdebt\b|\blend\b|\blent\b|\bborrow(ed)?\b|paid .+ for|transfer to|refund to/.test(desc))
+        return "Personal Transfer";
 
     return "Other";
 };
@@ -137,7 +141,9 @@ exports.categorizeTransaction = async (description, recentCorrections = []) => {
 - Bills & Utilities
 - Healthcare
 - Education
-- Investment
+- Investment (stocks, crypto, mutual funds, shares, bonds — money put to work for returns)
+- Savings (money set aside in savings account, piggybank, emergency fund — NOT investment)
+- Personal Transfer (paying someone back, settling a debt, money owed to a person — owe, owed, lent, borrowed, refund to person)
 - Salary
 - Business
 - Gifts
@@ -202,16 +208,20 @@ Top spending category: ${topCategory ? `${topCategory[0]} (₦${topCategory[1].t
 Current categories: ${JSON.stringify(currentCategoryBreakdown)}
 `;
 
-    const prompt = `You are a Nigerian financial advisor. Analyze this spending data and provide 3 SHORT, actionable insights.
+    const prompt = `You are a Nigerian financial advisor reviewing a student's spending. Give 3 specific, data-driven insights.
 
 ${summary}
 
-Format your response as a JSON array of exactly 3 strings. Each insight should be one sentence, practical, and specific to Nigerian context. Focus on the comparison if available.
+Rules:
+- Reference actual numbers from the data (amounts, percentages, category names)
+- Each insight must mention a specific action the user can take
+- Use Nigerian context (₦, mention common expenses like airtime, transport, data)
+- NO generic advice like "keep tracking your expenses"
 
-Example format:
-["Your Food spending is 40% of total expenses - consider meal prepping to save ₦5,000/month", "Transport costs are high - explore carpooling or bulk transport subscriptions", "Entertainment spending doubled this month - set a ₦10,000 weekly limit"]
+Format: JSON array of exactly 3 strings.
+Example: ["You spent ₦12,400 on Food this month — that's 45% of total. Try cooking at home 3x/week to cut this by ₦3,000", "Your Transport spend of ₦8,200 is up 30% — consider a weekly bus pass to save ₦2,000", "Airtime/Data at ₦3,500 this month: switching to a monthly bundle plan could save you ₦1,000"]
 
-Respond with ONLY the JSON array, no other text.`;
+Respond with ONLY the JSON array.`;
 
     try {
         const result = await generate(prompt);
@@ -260,9 +270,11 @@ exports.detectAnomalies = async (transactions) => {
 
 ${anomalies.map(a => `- ₦${a.amount.toLocaleString()} on ${a.category}: ${a.description}`).join("\n")}
 
-Write ONE friendly alert message (max 20 words) asking if these were intended purchases.
+Write ONE informational alert (max 20 words) noting these purchases were above average.
+Do NOT ask the user to reply or confirm. State it as information only.
+Example: "Heads up: Your ₦5,000 MTN Airtime and ₦4,500 transfer were above your usual spending."
 
-Respond with ONLY the message text, no quotes or formatting.`;
+Respond with ONLY the alert text, no quotes or formatting.`;
 
     try {
         const result = await generate(prompt);
@@ -345,7 +357,17 @@ exports.getInsights = async (req, res) => {
             ]);
         }
 
-        const insights = await exports.generateInsights(currentTransactions, previousTransactions, period);
+        // Silently widen to all-time if the requested period has no expenses
+        let effectivePeriod = period;
+        let effectiveCurrent = currentTransactions;
+        let effectivePrevious = previousTransactions;
+        if (period !== 'all' && currentTransactions.filter(t => t.type === 'expense').length === 0) {
+            effectiveCurrent = await Transaction.find({ userId }).lean();
+            effectivePrevious = [];
+            effectivePeriod = 'all';
+        }
+
+        const insights = await exports.generateInsights(effectiveCurrent, effectivePrevious, effectivePeriod);
 
         await Insight.findOneAndUpdate(
             { userId, period },
@@ -417,21 +439,23 @@ exports.getAccuracy = async (req, res) => {
     try {
         const userId = req.user.id;
 
-        const [aiCategorized, corrected, recentCorrections] = await Promise.all([
+        const [aiCategorized, confirmed, rejected, pending, recentCorrections] = await Promise.all([
             Transaction.countDocuments({ userId, aiSuggestedCategory: { $ne: null } }),
-            Transaction.countDocuments({ userId, aiSuggestedCategory: { $ne: null }, userOverrode: true }),
+            Transaction.countDocuments({ userId, aiSuggestedCategory: { $ne: null }, aiConfirmed: true }),
+            Transaction.countDocuments({ userId, aiSuggestedCategory: { $ne: null }, $or: [{ aiConfirmed: false }, { userOverrode: true, aiConfirmed: null }] }),
+            Transaction.countDocuments({ userId, aiSuggestedCategory: { $ne: null }, aiConfirmed: null, userOverrode: false }),
             CategoryCorrection.find({ userId })
                 .sort({ createdAt: -1 })
                 .limit(10)
                 .select("description originalCategory correctedCategory createdAt"),
         ]);
 
-        const accepted = aiCategorized - corrected;
-        const accuracyRate = aiCategorized > 0
-            ? Math.round((accepted / aiCategorized) * 100)
+        const reviewed = confirmed + rejected;
+        const accuracyRate = reviewed > 0
+            ? Math.round((confirmed / reviewed) * 100)
             : null;
 
-        res.json({ aiCategorized, accepted, corrected, accuracyRate, recentCorrections });
+        res.json({ aiCategorized, confirmed, rejected, pending, accuracyRate, recentCorrections });
     } catch (err) {
         console.error("Accuracy fetch error:", err);
         res.status(500).json({ message: "Failed to compute accuracy" });
@@ -484,7 +508,7 @@ exports.getForecast = async (req, res) => {
 
         const NO_DATA = {
             forecastData: [],
-            insight: "Add more transactions over multiple months to generate a forecast.",
+            insight: "Add some transactions to generate a forecast.",
             months: [],
         };
 
@@ -499,13 +523,8 @@ exports.getForecast = async (req, res) => {
             byMonth[key][t.category] = (byMonth[key][t.category] || 0) + t.amount;
         }
 
-        // Exclude the current in-progress month
-        const now = new Date();
-        const currentKey = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-        const completedMonths = Object.keys(byMonth).filter(k => k !== currentKey).sort();
-
-        // Take the 3 most recent complete months (oldest → newest)
-        const recentMonths = completedMonths.slice(-3);
+        // Take the 3 most recent months (oldest → newest), including the current in-progress month
+        const recentMonths = Object.keys(byMonth).sort().slice(-3);
 
         if (!recentMonths.length) return res.json(NO_DATA);
 
@@ -582,10 +601,11 @@ exports.getAIDashboard = async (req, res) => {
     try {
         const userId = req.user.id;
         const period = req.query.period || "month";
+        const forceRefresh = req.query.refresh === "true";
 
         // Check insights cache before the DB fetch so we can skip that Gemini call if warm
         const cachedInsights = await Insight.findOne({ userId, period });
-        const insightsCached = cachedInsights &&
+        const insightsCached = !forceRefresh && cachedInsights &&
             Date.now() - cachedInsights.generatedAt.getTime() < INSIGHT_TTL_MS;
 
         // One DB round-trip for all AI data
@@ -616,6 +636,12 @@ exports.getAIDashboard = async (req, res) => {
         const previousTransactions = period === "all" ? []
             : allTransactions.filter(t => new Date(t.date) >= previousStart && new Date(t.date) <= previousEnd);
 
+        // Silently widen to all-time if the requested period has no expenses
+        const noCurrentExpenses = period !== "all" && currentTransactions.filter(t => t.type === "expense").length === 0;
+        const effectivePeriod = noCurrentExpenses ? "all" : period;
+        const effectiveCurrentTx = noCurrentExpenses ? allTransactions : currentTransactions;
+        const effectivePreviousTx = noCurrentExpenses ? [] : previousTransactions;
+
         // Build forecast data from expenses in the shared transaction set
         const { forecastData, predictedAmount, history } = buildForecastData(
             allTransactions.filter(t => t.type === "expense")
@@ -642,7 +668,7 @@ Write a single, encouraging, and practical 1-sentence financial insight or tip a
         const [insightsResult, anomaly, forecastInsight] = await Promise.all([
             insightsCached
                 ? Promise.resolve(cachedInsights.insights)
-                : exports.generateInsights(currentTransactions, previousTransactions, period),
+                : exports.generateInsights(effectiveCurrentTx, effectivePreviousTx, effectivePeriod),
             exports.detectAnomalies(allTransactions),
             forecastGeminiPromise,
         ]);

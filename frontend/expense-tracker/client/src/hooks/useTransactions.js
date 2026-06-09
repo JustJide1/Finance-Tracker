@@ -96,6 +96,18 @@ export const useTransactions = (type) => {
         }
     };
 
+    const confirmCategory = async (id, confirmed) => {
+        try {
+            const result = await transactionService.confirmCategory(id, confirmed);
+            setTransactions(prev => prev.map(t =>
+                t._id === id ? { ...t, aiConfirmed: result.aiConfirmed, userOverrode: result.userOverrode } : t
+            ));
+        } catch (err) {
+            toast.error("Failed to save feedback");
+            throw err;
+        }
+    };
+
     return {
         transactions,
         loading,
@@ -104,6 +116,7 @@ export const useTransactions = (type) => {
         updateTransaction,
         deleteTransaction,
         deleteAllExpenses,
-        deleteAllIncome
+        deleteAllIncome,
+        confirmCategory,
     };
 };
