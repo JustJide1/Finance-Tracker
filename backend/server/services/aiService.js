@@ -124,7 +124,7 @@ Respond with ONLY the message text, no quotes or formatting.`;
 EXTRACTION RULES:
 
 1. TYPE: Determine if it's "income" (money received) or "expense" (money spent)
-   - Income keywords: received, earned, got paid, salary, payment came, made, profit
+   - Income keywords: received, earned, got paid, salary, payment came, made, profit, stipend, allowance, upkeep, pocket money, grant, bursary
    - Expense keywords: spent, bought, paid, used, cost
    - Default to "expense" if unclear but money was used
 
@@ -201,6 +201,9 @@ Output: {"type":"expense","amount":3000,"category":"Personal Care","description"
 Input: "Got allowance 5k"
 Output: {"type":"income","amount":5000,"category":"Allowance","description":"Allowance received","date":"${today}","confidence":"high","missingFields":[]}
 
+Input: "Got 30k stipend from dad"
+Output: {"type":"income","amount":30000,"category":"Allowance","description":"Stipend from dad","date":"${today}","confidence":"high","missingFields":[]}
+
 Input: "Bought stuff"
 Output: {"type":"expense","amount":0,"category":"Other","description":"Unspecified purchase","date":"${today}","confidence":"low","missingFields":["amount","specific category","description"]}
 
@@ -233,7 +236,7 @@ Now parse this input:
         const today = new Date().toISOString().split("T")[0];
 
         // Detect type
-        const isIncome = /received|earned|got paid|salary|profit|made/.test(lower);
+        const isIncome = /received|earned|got paid|salary|profit|made|stipend|allowance|upkeep|pocket money|grant|bursary/.test(lower);
         const type = isIncome ? "income" : "expense";
 
         // ── Foreign currency detection ──────────────────────────────────────
