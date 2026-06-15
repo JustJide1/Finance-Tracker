@@ -113,6 +113,8 @@ const categorizeByRules = (description) => {
         return "Personal Care";
     if (/\bowe(d|s)?\b|\bdebt\b|\blend\b|\blent\b|\bborrow(ed)?\b|paid .+ for|transfer to|refund to/.test(desc))
         return "Personal Transfer";
+    if (/\breceiv(ed|e)\b|\bcredit(ed)?\b|\bdeposit(ed)?\b|payment received|money received|cash received/.test(desc))
+        return "Income";
 
     return "Other";
 };
@@ -143,7 +145,8 @@ exports.categorizeTransaction = async (description, recentCorrections = []) => {
 - Education
 - Investment (stocks, crypto, mutual funds, shares, bonds — money put to work for returns)
 - Savings (money set aside in savings account, piggybank, emergency fund — NOT investment)
-- Personal Transfer (paying someone back, settling a debt, money owed to a person — owe, owed, lent, borrowed, refund to person)
+- Income (money received with no clear indication of its source — generic deposits, unspecified transfers received)
+- Personal Transfer (paying someone back, or being repaid by a NAMED person for a specific debt — owe, owed, lent, borrowed, refund to/from a named person)
 - Salary
 - Business
 - Gifts
@@ -152,6 +155,8 @@ exports.categorizeTransaction = async (description, recentCorrections = []) => {
 - Other
 ${fewShotSection}
 Transaction description: "${description}"
+
+If money was received but the description gives no clear indication of where it came from, respond with Income, NOT Personal Transfer.
 
 Respond with ONLY the category name, nothing else.`;
 

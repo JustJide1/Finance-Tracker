@@ -6,7 +6,7 @@ export default function AccuracyCard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        axios.get("/api/ai/accuracy")
+        axios.get("/ai/accuracy")
             .then(res => setData(res.data))
             .catch(() => setData(null))
             .finally(() => setLoading(false));

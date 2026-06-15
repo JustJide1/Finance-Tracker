@@ -10,7 +10,7 @@ function ForecastCard() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        axios.get("/api/ai/forecast")
+        axios.get("/ai/forecast")
             .then(res => setData(res.data))
             .catch(() => setData(null))
             .finally(() => setLoading(false));

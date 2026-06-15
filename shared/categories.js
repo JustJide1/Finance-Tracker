@@ -8,6 +8,7 @@ const CATEGORIES = [
     "Education",
     "Investment",
     "Savings",
+    "Income",
     "Salary",
     "Business",
     "Allowance",

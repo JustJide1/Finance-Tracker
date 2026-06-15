@@ -155,7 +155,8 @@ EXTRACTION RULES:
    - Personal Care: haircut, salon, spa, grooming, skincare, cosmetics, barbing
    - Savings: money deliberately set aside (save, saved, savings account, piggybank, kuda savings, emergency fund, target savings, saving up) — NOT investment
    - Investment: money put to work for returns (invest, stock, crypto, shares, mutual fund, bonds, real estate investment) — NOT savings
-   - Personal Transfer: paying someone back, settling a debt, money owed (paid [name], owe, owed, debt, refund to, transfer to [person], "for what I owe", "balance", "lend", "borrowed")
+   - Income: money received with no clear indication of its source (generic deposit, unspecified transfer received, "got money", "received cash"). Use this for income when no other category fits — NOT Personal Transfer
+   - Personal Transfer: paying someone back, or being repaid by a NAMED person for a specific debt (paid [name], owe, owed, debt, refund to/from [person], "for what I owe", "balance", "lend", "borrowed"). Do NOT use for vague income with no named source — use Income instead
 
 4. DESCRIPTION: Create a clean, concise description (3-8 words). If currency was converted, include the original amount, e.g. "Groceries ($50 → ₦80,000)"
 
@@ -206,6 +207,9 @@ Output: {"type":"income","amount":5000,"category":"Allowance","description":"All
 
 Input: "Got 30k stipend from dad"
 Output: {"type":"income","amount":30000,"category":"Allowance","description":"Stipend from dad","date":"${today}","confidence":"high","missingFields":[]}
+
+Input: "Received 5000, not sure who sent it"
+Output: {"type":"income","amount":5000,"category":"Income","description":"Unspecified income received","date":"${today}","confidence":"medium","missingFields":["source"]}
 
 Input: "Paid 1000 to Ayomide for something I owe him"
 Output: {"type":"expense","amount":1000,"category":"Personal Transfer","description":"Debt repayment to Ayomide","date":"${today}","confidence":"high","missingFields":[]}
@@ -379,9 +383,14 @@ Now parse this input:
         else if (/salon|barber|haircut|spa|grooming|skincare|beauty|personal care|cosmetics|manicure|pedicure|barbing/.test(lower)) category = "Personal Care";
         else if (/\bowe(d|s)?\b|\bdebt\b|\blend\b|\blent\b|\bborrow(ed)?\b|paid .+ for|transfer to|refund to/.test(lower)) category = "Personal Transfer";
 
+        const categoryUnclear = category === "Other";
+
+        // Income with no identifiable source — "Income" instead of "Other"
+        if (categoryUnclear && type === "income") category = "Income";
+
         const missingFields = [];
         if (!amount) missingFields.push("amount");
-        if (category === "Other") missingFields.push("category");
+        if (categoryUnclear) missingFields.push("category");
 
         const description = (text.slice(0, 45) + foreignNote).slice(0, 80);
 
@@ -391,7 +400,7 @@ Now parse this input:
             category,
             description,
             date,
-            confidence: amount && category !== "Other" ? "medium" : "low",
+            confidence: amount && !categoryUnclear ? "medium" : "low",
             missingFields,
         };
     };

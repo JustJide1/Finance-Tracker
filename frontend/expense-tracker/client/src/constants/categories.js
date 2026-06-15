@@ -7,6 +7,7 @@ const CATEGORIES = [
     "Healthcare",
     "Education",
     "Investment",
+    "Income",
     "Salary",
     "Business",
     "Allowance",
