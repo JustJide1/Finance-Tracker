@@ -63,10 +63,11 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, onC
                 {MAIN_NAV.map((item) => (
                     <button
                         key={item.id}
+                        className="sidebar-navbtn"
                         style={{ ...S.navBtn, ...(isActive(item) ? S.navBtnActive : {}) }}
                         onClick={() => handleNavClick(item)}
                     >
-                        <span style={{ ...S.navIcon, ...(isActive(item) ? S.navIconActive : {}) }}>
+                        <span className="nav-icon" style={{ ...S.navIcon, ...(isActive(item) ? S.navIconActive : {}) }}>
                             {item.icon}
                         </span>
                         {item.label}
@@ -79,17 +80,18 @@ export default function Sidebar({ activeTab, setActiveTab, onLogout, isOpen, onC
                 {BOTTOM_NAV.map((item) => (
                     <button
                         key={item.id}
+                        className="sidebar-navbtn"
                         style={{ ...S.navBtn, ...(isActive(item) ? S.navBtnActive : {}) }}
                         onClick={() => handleNavClick(item)}
                     >
-                        <span style={{ ...S.navIcon, ...(isActive(item) ? S.navIconActive : {}) }}>
+                        <span className="nav-icon" style={{ ...S.navIcon, ...(isActive(item) ? S.navIconActive : {}) }}>
                             {item.icon}
                         </span>
                         {item.label}
                     </button>
                 ))}
-                <button style={S.logoutBtn} onClick={onLogout}>
-                    <span style={S.navIcon}>{I.logout}</span>
+                <button className="sidebar-logout-btn" style={S.logoutBtn} onClick={onLogout}>
+                    <span className="nav-icon" style={S.navIcon}>{I.logout}</span>
                     Logout
                 </button>
             </div>
@@ -165,7 +167,10 @@ const S = {
         display: "flex",
         alignItems: "center",
         gap: 10,
-        padding: "9px 10px",
+        paddingTop: 9,
+        paddingRight: 10,
+        paddingBottom: 9,
+        paddingLeft: 10,
         borderRadius: 9,
         border: "none",
         borderLeft: "3px solid transparent",
@@ -224,10 +229,13 @@ const S = {
 
 if (typeof window !== "undefined") {
     const id = "sidebar-fintpay-styles";
-    if (!document.getElementById(id)) {
-        const el = document.createElement("style");
+    let el = document.getElementById(id);
+    if (!el) {
+        el = document.createElement("style");
         el.id = id;
-        el.textContent = `
+        document.head.appendChild(el);
+    }
+    el.textContent = `
             @media (max-width: 768px) {
                 aside.sidebar {
                     position: fixed !important;
@@ -239,8 +247,8 @@ if (typeof window !== "undefined") {
                 aside.sidebar.sidebar-open { transform: translateX(0) !important; }
                 .sidebar-close-btn { display: flex !important; align-items: center; }
             }
-            .sidebar-navbtn:hover { background: rgba(45,106,79,0.06) !important; }
+            .sidebar-navbtn:hover { background: rgba(45,106,79,0.10) !important; color: #1A4731 !important; }
+            .sidebar-navbtn:hover .nav-icon { color: #2D6A4F !important; }
+            .sidebar-logout-btn:hover { background: rgba(220,38,38,0.06) !important; }
         `;
-        document.head.appendChild(el);
-    }
 }

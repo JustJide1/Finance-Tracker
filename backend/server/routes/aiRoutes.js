@@ -27,11 +27,13 @@ router.use(authMiddleware);
 // Per-user limiter for heavyweight AI endpoints (insights, forecast, anomalies, dashboard).
 // These each trigger 1-3 Gemini calls. keyGenerator is per-user (not per-IP) because
 // the 24-hour Insight cache makes repeat hits cheap — the limit is for cold-cache bursts.
-// 3 requests/minute per user is generous: results are cached for 24 h so one real call/day
-// is the normal pattern; 3/min handles legitimate retries and period changes.
+// A single dashboard page view costs 2 requests (dashboard + forecast), and React
+// StrictMode double-invokes effects in dev, so one mount can fire 4 requests.
+// 6/minute leaves headroom for that plus a manual refresh; results are cached for
+// 24h so this only matters on cold-cache bursts.
 const heavyAiLimiter = rateLimit({
     windowMs:       60 * 1_000,
-    max:            3,
+    max:            6,
     standardHeaders: true,
     legacyHeaders:  false,
     keyGenerator:   (req) => req.user.id,   // req.user set by authMiddleware above
