@@ -13,6 +13,7 @@ const {
     getForecast,
     getAccuracy,
     getAIDashboard,
+    getBudgetSuggestions,
 } = require("../controllers/aiController");
 const {
     validate,
@@ -77,5 +78,8 @@ router.get("/dashboard", heavyAiLimiter, getAIDashboard);
 
 // No extra per-user limit: accuracy just reads DB, no Gemini call
 router.get("/accuracy", getAccuracy);
+
+// Budget suggestions — Gemini call + 24h cache, same weight class as insights
+router.get("/budget-suggestions", heavyAiLimiter, getBudgetSuggestions);
 
 module.exports = router;

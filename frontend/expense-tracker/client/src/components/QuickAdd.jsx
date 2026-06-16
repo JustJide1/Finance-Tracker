@@ -4,8 +4,6 @@ import { useAI } from "../hooks/useAI";
 import { useToast } from "./Toast";
 import CATEGORIES from "../constants/categories";
 
-const SR = window.SpeechRecognition || window.webkitSpeechRecognition || null;
-
 const EXAMPLES = ["Spent 2k on lunch today", "Got paid 10k for salary"];
 
 const REVIEW_FIELDS = [
@@ -79,18 +77,6 @@ const S = {
         whiteSpace: "nowrap",
         border: 0,
     },
-    micBtn: {
-        width: 44,
-        borderRadius: 12,
-        border: "1.5px solid #E5E7EB",
-        cursor: "pointer",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-        padding: 0,
-        transition: "background 0.15s ease",
-    },
     examples: { display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" },
     examplesLabel: { fontSize: 12, color: "#9CA3AF" },
     exampleChip: {
@@ -162,15 +148,7 @@ const CONFIDENCE_STYLES = {
     low: { ...S.confidenceBadge, background: "rgba(220,38,38,0.08)", color: "#DC2626" },
 };
 
-const SPINNER_KEYFRAMES = `
-@keyframes qa-spin {
-  to { transform: rotate(360deg); }
-}
-@keyframes qa-pulse {
-  0%, 100% { transform: scale(1); }
-  50% { transform: scale(1.18); }
-}
-`;
+const SPINNER_KEYFRAMES = `@keyframes qa-spin { to { transform: rotate(360deg); } }`;
 
 let _spinnerStyleInjected = false;
 function injectSpinnerStyle() {
@@ -233,7 +211,6 @@ const ParsedField = memo(({ field, label, type, options, value, onChange }) => {
 function QuickAdd({ onSuccess }) {
     const [input, setInput] = useState("");
     const [parsed, setParsed] = useState(null);
-    const [isListening, setIsListening] = useState(false);
     const toast = useToast();
 
     const { createTransaction } = useTransactions();
@@ -291,31 +268,6 @@ function QuickAdd({ onSuccess }) {
 
     const handleChangeInput = useCallback((e) => setInput(e.target.value), []);
 
-    const handleMicClick = useCallback(() => {
-        if (!SR) return;
-        const startRecognition = (lang) => {
-            const r = new SR();
-            r.lang = lang;
-            r.continuous = false;
-            r.interimResults = false;
-            r.onresult = (e) => {
-                setInput(e.results[0][0].transcript);
-                setIsListening(false);
-            };
-            r.onerror = (e) => {
-                if (lang === "en-NG" && e.error === "language-not-supported") {
-                    startRecognition("en-GB");
-                } else {
-                    setIsListening(false);
-                }
-            };
-            r.onend = () => setIsListening(false);
-            r.start();
-        };
-        setIsListening(true);
-        startRecognition("en-NG");
-    }, []);
-
     return (
         <div style={S.card}>
             <div style={S.header}>
@@ -340,31 +292,6 @@ function QuickAdd({ onSuccess }) {
                     disabled={parsing}
                     aria-disabled={parsing}
                 />
-                {SR && (
-                    <button
-                        type="button"
-                        style={{ ...S.micBtn, background: isListening ? "#FEE2E2" : "white" }}
-                        onClick={handleMicClick}
-                        aria-label={isListening ? "Stop listening" : "Use microphone"}
-                        disabled={parsing}
-                    >
-                        <svg
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke={isListening ? "#DC2626" : "#9CA3AF"}
-                            strokeWidth="2"
-                            width="20"
-                            height="20"
-                            style={isListening ? { animation: "qa-pulse 1s ease-in-out infinite" } : undefined}
-                            aria-hidden="true"
-                        >
-                            <rect x="9" y="2" width="6" height="11" rx="3"/>
-                            <path d="M5 10a7 7 0 0 0 14 0"/>
-                            <line x1="12" y1="17" x2="12" y2="21"/>
-                            <line x1="8" y1="21" x2="16" y2="21"/>
-                        </svg>
-                    </button>
-                )}
                 <button
                     style={parsing ? { ...S.btn, ...S.btnLoading } : S.btn}
                     type="submit"
@@ -422,4 +349,3 @@ function QuickAdd({ onSuccess }) {
 }
 
 export default memo(QuickAdd);
-

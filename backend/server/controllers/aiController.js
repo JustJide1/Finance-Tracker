@@ -2,9 +2,12 @@ const Transaction = require("../models/Transaction");
 const Insight = require("../models/Insight");
 const InsightHistory = require("../models/InsightHistory");
 const CategoryCorrection = require("../models/CategoryCorrection");
+const BudgetSuggestion = require("../models/BudgetSuggestion");
 const { generate, QUEUE_FULL_MSG, QUOTA_EXCEEDED_MSG } = require("../utils/geminiLimiter");
 const { getRecentCorrections } = require("../utils/correctionCache");
 const { getCachedCategory, setCachedCategory } = require("../utils/categorizationCache");
+const { parseNaturalLanguage } = require("../services/aiService");
+const { getCategorySpendingSummary, getRuleBasedBudgetSuggestions, getAIBudgetSuggestions } = require("../services/budgetSuggestionService");
 
 // Returns true when the error means the AI system is temporarily overloaded —
 // callers should respond with 503 + Retry-After rather than a generic 500.
@@ -74,7 +77,6 @@ exports.parseTransaction = async (req, res) => {
     }
 
     try {
-        const { parseNaturalLanguage } = require("../services/aiService");
         const parsed = await parseNaturalLanguage(text);
         res.json(parsed);
     } catch (err) {
@@ -598,6 +600,60 @@ exports.getForecast = async (req, res) => {
     } catch (err) {
         console.error("Forecast generation error:", err);
         res.status(500).json({ message: "Failed to generate forecast" });
+    }
+};
+
+const SUGGESTION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+// GET /api/ai/budget-suggestions
+exports.getBudgetSuggestions = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        const cached = await BudgetSuggestion.findOne({ userId }).sort({ generatedAt: -1 }).lean();
+        if (cached && Date.now() - new Date(cached.generatedAt).getTime() < SUGGESTION_TTL_MS) {
+            return res.json({ suggestions: cached.suggestions, overallTip: cached.overallTip, source: cached.source, cached: true });
+        }
+
+        const { spendingSummary, existingBudgets } = await getCategorySpendingSummary(userId, 3);
+
+        if (spendingSummary.length === 0) {
+            return res.json({
+                suggestions: [],
+                overallTip: "Add some transactions to get personalised budget suggestions.",
+                source: "rule-based",
+                cached: false,
+            });
+        }
+
+        let result;
+        let source;
+        try {
+            result = await getAIBudgetSuggestions(userId, spendingSummary, existingBudgets);
+            source = "gemini";
+        } catch (aiErr) {
+            if (aiErr.isQuotaError || aiErr.isLimiterError || aiErr.isTimeout) {
+                console.warn("⚠️  Budget suggestions: Gemini unavailable, using rule-based fallback");
+            } else {
+                console.error("Budget suggestions AI error:", aiErr.message);
+            }
+            result = getRuleBasedBudgetSuggestions(spendingSummary);
+            source = "rule-based";
+        }
+
+        await BudgetSuggestion.findOneAndUpdate(
+            { userId },
+            { suggestions: result.suggestions, overallTip: result.overallTip, source, generatedAt: new Date() },
+            { upsert: true },
+        );
+
+        res.json({ suggestions: result.suggestions, overallTip: result.overallTip, source, cached: false });
+    } catch (err) {
+        console.error("getBudgetSuggestions error:", err);
+        if (isOverloadError(err)) {
+            return res.status(503).set("Retry-After", "60").json({ message: "AI system is busy, please retry shortly." });
+        }
+        res.status(500).json({ message: "Failed to generate budget suggestions" });
     }
 };
 

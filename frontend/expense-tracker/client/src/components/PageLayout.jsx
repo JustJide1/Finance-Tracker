@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import useAuthStore from "../store/authStore";
 import Sidebar from "./Sidebar";
+import QuickAddFAB from "./QuickAddFAB";
 
 export default function PageLayout({
     activeTab,
@@ -10,6 +11,7 @@ export default function PageLayout({
     subtitle,
     headerRight,
     contentStyle,
+    hideQuickAddFAB = false,
     children,
 }) {
     const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -74,6 +76,8 @@ export default function PageLayout({
                     {children}
                 </div>
             </div>
+
+            {!hideQuickAddFAB && <QuickAddFAB />}
         </div>
     );
 }

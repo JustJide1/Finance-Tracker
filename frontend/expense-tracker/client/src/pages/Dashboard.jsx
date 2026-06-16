@@ -35,6 +35,7 @@ export default function Dashboard() {
             title={tabTitles[activeTab] ?? tabTitles.dashboard}
             subtitle={tabSubtitles[activeTab]}
             headerRight={<ExportButton />}
+            hideQuickAddFAB={activeTab === "dashboard"}
         >
             {renderView()}
         </PageLayout>

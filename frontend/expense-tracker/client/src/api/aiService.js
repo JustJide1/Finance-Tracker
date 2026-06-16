@@ -35,4 +35,8 @@ export const aiService = {
         const response = await axios.get('/ai/insights/history');
         return response.data;
     },
+    getBudgetSuggestions: async () => {
+        const response = await axios.get('/ai/budget-suggestions');
+        return response.data;
+    },
 };

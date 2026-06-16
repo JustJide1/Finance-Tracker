@@ -5,6 +5,7 @@ import PageLayout from "../components/PageLayout";
 import { useToast } from "../components/Toast";
 import { getStatusColor } from "../utils/statusColors";
 import CATEGORIES from "../constants/categories";
+import BudgetSuggestionCard from "../components/BudgetSuggestionCard";
 
 export default function Budgets() {
     const [form, setForm] = useState({ category: "", amount: "", period: "monthly" });
@@ -31,6 +32,18 @@ export default function Budgets() {
 
     const handleEdit = (b) => { setEditingId(b._id); setForm({ category: b.category, amount: b.amount.toString(), period: b.period }); };
     const handleCancel = () => { setEditingId(null); setForm({ category: "", amount: "", period: "monthly" }); };
+
+    const handleApplySuggestion = ({ category, amount }) => {
+        const existing = budgets.find(b => b.category === category);
+        if (existing) {
+            setEditingId(existing._id);
+            setForm({ category, amount: amount.toString(), period: existing.period });
+        } else {
+            setEditingId(null);
+            setForm({ category, amount: amount.toString(), period: "monthly" });
+        }
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    };
     const handleDelete = (id) => setPendingDeleteId(id);
 
     const confirmDelete = async () => {
@@ -61,6 +74,8 @@ export default function Budgets() {
             subtitle="Track your spending limits"
             contentStyle={{ display: "flex", flexDirection: "column", gap: "1.25rem" }}
         >
+            <BudgetSuggestionCard onApply={handleApplySuggestion} />
+
             <div style={S.card}>
                 <h3 style={S.cardTitle}>{editingId ? "Edit Budget" : "Add Budget"}</h3>
                 <form style={S.form} onSubmit={handleSubmit}>
