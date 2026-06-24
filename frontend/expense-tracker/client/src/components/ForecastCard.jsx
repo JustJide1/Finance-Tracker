@@ -43,6 +43,14 @@ function ForecastCard() {
 
     const truncate = (str) => str.length > 10 ? str.slice(0, 10) + "…" : str;
 
+    // months is ordered oldest→newest and only contains entries for months with actual data.
+    // m1 = most recent, m2 = second most recent (if ≥2), m3 = oldest (if ≥3).
+    // Map labels from the end so they always align with the correct data slot.
+    const n = months.length;
+    const m1Label = months[n - 1] || "Current month";
+    const m2Label = n >= 2 ? months[n - 2] : null;
+    const m3Label = n >= 3 ? months[0] : null;
+
     return (
         <div style={S.card}>
             <div style={S.header}>
@@ -86,8 +94,9 @@ function ForecastCard() {
                         iconSize={10}
                         wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
                     />
-                    <Bar dataKey="m3" name={months[0] || "Oldest month"}   fill="#CBD5E1" radius={[3, 3, 0, 0]} />
-                    <Bar dataKey="m2" name={months[1] || "Previous month"} fill="#94A3B8" radius={[3, 3, 0, 0]} />
+                    {m3Label && <Bar dataKey="m3" name={m3Label} fill="#CBD5E1" radius={[3, 3, 0, 0]} />}
+                    {m2Label && <Bar dataKey="m2" name={m2Label} fill="#94A3B8" radius={[3, 3, 0, 0]} />}
+                    <Bar dataKey="m1" name={m1Label} fill="#64748B" radius={[3, 3, 0, 0]} />
                     <Bar dataKey="forecastAmount" name="Predicted (next month)" fill="rgba(45,106,79,0.85)" radius={[3, 3, 0, 0]} />
                 </BarChart>
             </ResponsiveContainer>

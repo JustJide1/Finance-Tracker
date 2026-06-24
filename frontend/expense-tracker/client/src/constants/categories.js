@@ -4,6 +4,7 @@ const CATEGORIES = [
     "Shopping",
     "Entertainment",
     "Bills & Utilities",
+    "Internet",
     "Healthcare",
     "Education",
     "Investment",

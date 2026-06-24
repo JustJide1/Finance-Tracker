@@ -15,6 +15,13 @@ const getNextRun = (currentDate, frequency) => {
 // Process all due recurring transactions
 exports.processRecurring = async () => {
     const now = new Date();
+
+    // Mark any active rules whose end date has already passed as inactive
+    await Recurring.updateMany(
+        { isActive: true, endDate: { $lt: now } },
+        { isActive: false }
+    );
+
     const dueRecurring = await Recurring.find({
         isActive: true,
         nextRun: { $lte: now },

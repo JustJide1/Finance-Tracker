@@ -1,4 +1,5 @@
 const Transaction = require("../models/Transaction");
+const User = require("../models/user");
 const Insight = require("../models/Insight");
 const InsightHistory = require("../models/InsightHistory");
 const CategoryCorrection = require("../models/CategoryCorrection");
@@ -255,27 +256,60 @@ Respond with ONLY the JSON array.`;
 };
 
 // Detect anomalies
-exports.detectAnomalies = async (transactions) => {
-    if (transactions.length < 10) {
-        return null;
-    }
+// Uses a 90-day rolling window, per-category baselines, and persists flagged IDs
+// so the same transactions never trigger the banner twice.
+exports.detectAnomalies = async (transactions, userId) => {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - 90);
 
-    const expenses = transactions
-        .filter(t => t.type === "expense")
-        .map(t => t.amount);
-
-    const average = expenses.reduce((a, b) => a + b, 0) / expenses.length;
-    const threshold = average * 2;
-
-    const anomalies = transactions.filter(
-        t => t.type === "expense" && t.amount > threshold
+    const recentExpenses = transactions.filter(
+        t => t.type === "expense" && new Date(t.date) >= cutoff
     );
 
-    if (anomalies.length === 0) return null;
+    if (recentExpenses.length < 5) return null;
 
-    const prompt = `A user made these unusually large purchases (average spending: ₦${average.toFixed(0)}):
+    // Group by category and compute per-category mean
+    const byCategory = {};
+    for (const t of recentExpenses) {
+        const cat = t.category || "Other";
+        if (!byCategory[cat]) byCategory[cat] = [];
+        byCategory[cat].push(t);
+    }
 
-${anomalies.map(a => `- ₦${a.amount.toLocaleString()} on ${a.category}: ${a.description}`).join("\n")}
+    // Load IDs already flagged for this user so we don't re-alert them
+    const userDoc = userId
+        ? await User.findById(userId).select("flaggedAnomalyIds").lean()
+        : null;
+    const alreadyFlagged = new Set((userDoc?.flaggedAnomalyIds || []).map(String));
+
+    const newAnomalies = [];
+    for (const [cat, txns] of Object.entries(byCategory)) {
+        if (txns.length < 2) continue; // need at least 2 to establish a baseline
+        const mean = txns.reduce((sum, t) => sum + t.amount, 0) / txns.length;
+        const threshold = mean * 2;
+        for (const t of txns) {
+            const id = String(t._id);
+            if (t.amount > threshold && !alreadyFlagged.has(id)) {
+                newAnomalies.push({ ...t, _categoryMean: mean });
+            }
+        }
+    }
+
+    if (newAnomalies.length === 0) return null;
+
+    // Persist the new IDs so they won't fire again
+    if (userId) {
+        const newIds = newAnomalies.map(t => String(t._id));
+        await User.updateOne(
+            { _id: userId },
+            { $addToSet: { flaggedAnomalyIds: { $each: newIds } } }
+        );
+    }
+
+    const overallMean = recentExpenses.reduce((sum, t) => sum + t.amount, 0) / recentExpenses.length;
+    const prompt = `A user made these unusually large purchases (average spending: ₦${overallMean.toFixed(0)}):
+
+${newAnomalies.map(a => `- ₦${a.amount.toLocaleString()} on ${a.category}: ${a.description} (category avg: ₦${a._categoryMean.toFixed(0)})`).join("\n")}
 
 Write ONE informational alert (max 20 words) noting these purchases were above average.
 Do NOT ask the user to reply or confirm. State it as information only.
@@ -431,7 +465,7 @@ exports.checkAnomalies = async (req, res) => {
         const transactions = await Transaction.find(
             { userId: req.user.id, date: { $gte: since } }
         ).lean();
-        const alert = await exports.detectAnomalies(transactions);
+        const alert = await exports.detectAnomalies(transactions, req.user.id);
         res.json({ alert });
     } catch (err) {
         if (isOverloadError(err)) {
@@ -730,7 +764,7 @@ Write a single, encouraging, and practical 1-sentence financial insight or tip a
             insightsCached
                 ? Promise.resolve(cachedInsights.insights)
                 : exports.generateInsights(effectiveCurrentTx, effectivePreviousTx, effectivePeriod),
-            exports.detectAnomalies(allTransactions),
+            exports.detectAnomalies(allTransactions, userId),
             forecastGeminiPromise,
         ]);
 

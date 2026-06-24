@@ -151,8 +151,6 @@ function processTransactions(txns) {
     return { yd, sd, cd, wd, sl, slInc };
 }
 
-
-
 /* ── Onboarding panel ────────────────────────────────────────────────────── */
 const ONBOARD_STEPS = [
     {
@@ -219,9 +217,98 @@ const OnboardingPanel = memo(function OnboardingPanel() {
     );
 });
 
+/* ── Transaction detail modal ────────────────────────────────────────────── */
+const CONFIDENCE_STYLE = {
+    high:   { bg: "rgba(45,106,79,0.10)",  color: "#1A5C3A" },
+    medium: { bg: "rgba(234,179,8,0.12)",  color: "#92400E" },
+    low:    { bg: "rgba(220,38,38,0.10)",  color: "#991B1B" },
+};
+
+const DetailRow = memo(function DetailRow({ label, value, confidence }) {
+    const cs = confidence ? CONFIDENCE_STYLE[confidence] : null;
+    return (
+        <div style={SM.detailRow}>
+            <span style={SM.detailLabel}>{label}</span>
+            {cs ? (
+                <span style={{ ...SM.detailValue, background: cs.bg, color: cs.color, borderRadius: 20, padding: "2px 9px", fontSize: 12 }}>
+                    {value}
+                </span>
+            ) : (
+                <span style={SM.detailValue}>{value}</span>
+            )}
+        </div>
+    );
+});
+
+const TxDetailModal = memo(function TxDetailModal({ tx, onClose }) {
+    if (!tx) return null;
+    const isExpense = tx.type === "expense";
+    const dateObj = new Date(tx.date);
+    const dateStr = dateObj.toLocaleDateString("en-NG", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    const timeStr = dateObj.toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+    const createdStr = tx.createdAt
+        ? new Date(tx.createdAt).toLocaleString("en-NG", { dateStyle: "medium", timeStyle: "short" })
+        : null;
+
+    return (
+        <div onClick={onClose} style={SM.overlay} role="dialog" aria-modal="true">
+            <div onClick={e => e.stopPropagation()} style={SM.panel}>
+                {/* Header */}
+                <div style={SM.header}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <span style={{ ...SM.typeBadge, background: isExpense ? "rgba(220,38,38,0.09)" : "rgba(45,106,79,0.09)", color: isExpense ? "#DC2626" : "#2D6A4F" }}>
+                            {isExpense ? "Expense" : "Income"}
+                        </span>
+                        <p style={SM.desc}>{tx.description}</p>
+                    </div>
+                    <button onClick={onClose} style={SM.closeBtn} aria-label="Close">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                            <line x1="1" y1="1" x2="11" y2="11"/><line x1="11" y1="1" x2="1" y2="11"/>
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Amount */}
+                <div style={{
+                    ...SM.amountBlock,
+                    color: isExpense ? "#DC2626" : "#2D6A4F",
+                    background: isExpense ? "rgba(220,38,38,0.06)" : "rgba(45,106,79,0.06)",
+                }}>
+                    {isExpense ? "−" : "+"}₦{tx.amount.toLocaleString()}
+                </div>
+
+                {/* Details */}
+                <div style={SM.grid}>
+                    <DetailRow label="Category" value={tx.category} />
+                    <DetailRow label="Date" value={dateStr} />
+                    <DetailRow label="Time" value={timeStr} />
+                    {tx.aiSuggestedCategory && (
+                        <DetailRow label="AI Category" value={tx.aiSuggestedCategory} />
+                    )}
+                    {tx.aiConfidence && (
+                        <DetailRow
+                            label="AI Confidence"
+                            value={tx.aiConfidence.charAt(0).toUpperCase() + tx.aiConfidence.slice(1)}
+                            confidence={tx.aiConfidence}
+                        />
+                    )}
+                    {tx.userOverrode && (
+                        <DetailRow label="Category Source" value="Manually overridden" />
+                    )}
+                    {createdStr && (
+                        <DetailRow label="Logged" value={createdStr} />
+                    )}
+                </div>
+
+                <button onClick={onClose} style={SM.footerClose}>Close</button>
+            </div>
+        </div>
+    );
+});
+
 /* ── Main component ──────────────────────────────────────────────────────── */
 export default function DashboardHome() {
-    const { stats, transactions, recentTransactions, loading, fetchData } = useDashboardData();
+    const { stats, transactions, loading, fetchData } = useDashboardData();
     const { getAIDashboard } = useAI();
     const [insightsData, setInsightsData] = useState(null);
     const [loadingInsights, setLoadingInsights] = useState(true);
@@ -229,6 +316,7 @@ export default function DashboardHome() {
     const [loadingForecast, setLoadingForecast] = useState(true);
     const [refreshingInsights, setRefreshingInsights] = useState(false);
     const [anomalyDismissed, setAnomalyDismissed] = useState(false);
+    const [selectedTx, setSelectedTx] = useState(null);
 
     useEffect(() => {
         const id = "dashboard-fintpay-styles";
@@ -252,6 +340,11 @@ export default function DashboardHome() {
                 .ft-row3 { grid-template-columns: 1fr !important; }
                 .ft-insights-grid { grid-template-columns: 1fr !important; }
             }
+            .ft-tx-row:hover { background: #F9FAFB !important; }
+            .ft-tx-row:active { background: #F3F4F6 !important; }
+            .ft-tx-scroll::-webkit-scrollbar { width: 5px; }
+            .ft-tx-scroll::-webkit-scrollbar-track { background: transparent; }
+            .ft-tx-scroll::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 999px; }
         `;
         document.head.appendChild(el);
         return () => el.remove();
@@ -295,10 +388,21 @@ export default function DashboardHome() {
 
     const { yd, sd, cd, wd, sl, slInc } = useMemo(() => processTransactions(transactions), [transactions]);
 
+    /* Today's transactions (local date) */
+    const todayTransactions = useMemo(() => {
+        const now = new Date();
+        const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+        return transactions.filter(t => {
+            if (!t.date) return false;
+            const d = new Date(t.date);
+            const s = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+            return s === todayStr;
+        });
+    }, [transactions]);
+
     const balance = stats?.balance ?? 0;
     const totalExpenses = stats?.totalExpenses ?? 0;
     const totalIncome = stats?.totalIncome ?? 0;
-    // pct and balancePct are pre-computed by the server aggregation — no need to derive from transactions
     const pct = stats?.pct ?? null;
     const balancePct = stats?.balancePct ?? null;
 
@@ -348,8 +452,6 @@ export default function DashboardHome() {
                             {balancePct >= 0 ? "+" : ""}{balancePct}% vs last month
                         </div>
                     )}
-
-
 
                     {/* Sparkline pushed to bottom */}
                     <div style={S.heroChartWrap}>
@@ -581,49 +683,77 @@ export default function DashboardHome() {
                 </div>
             </div>
 
-            {/* ── Recent Transactions ── */}
+            {/* ── Today's Transactions ── */}
             <div style={S.card}>
                 <div style={S.cardHead}>
-                    <span style={S.cardTitle}>Recent Transactions</span>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span style={S.cardTitle}>Today's Transactions</span>
+                        {todayTransactions.length > 0 && (
+                            <span style={S.countBadge}>{todayTransactions.length}</span>
+                        )}
+                    </div>
                     <button style={S.refreshBtn} onClick={fetchData}>Refresh</button>
                 </div>
-                {recentTransactions.length === 0 ? (
-                    <p style={S.empty}>No transactions yet. Add income or expenses to get started.</p>
+
+                {todayTransactions.length === 0 ? (
+                    <p style={S.empty}>No transactions today yet.</p>
                 ) : (
-                    <div style={{ overflowX: "auto" }}>
-                        <table style={S.table}>
-                            <thead>
-                                <tr>
-                                    {["Description", "Category", "Date", "Amount"].map(h => (
-                                        <th key={h} style={S.th}>{h}</th>
-                                    ))}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {recentTransactions.map(t => (
-                                    <tr key={t._id} style={S.tr}>
-                                        <td style={S.td}>{t.description}</td>
-                                        <td style={S.td}>{t.category}</td>
-                                        <td style={S.td}>{new Date(t.date).toLocaleDateString()}</td>
-                                        <td style={{
-                                            ...S.td,
-                                            color: t.type === "expense" ? "#DC2626" : "#2D6A4F",
-                                            fontWeight: 600,
-                                        }}>
-                                            {t.type === "expense" ? "-" : "+"}₦{t.amount.toLocaleString()}
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div style={S.txScroll} className="ft-tx-scroll">
+                        {todayTransactions.map(t => {
+                            const isExp = t.type === "expense";
+                            const timeStr = new Date(t.date).toLocaleTimeString("en-NG", { hour: "2-digit", minute: "2-digit" });
+                            return (
+                                <div
+                                    key={t._id}
+                                    onClick={() => setSelectedTx(t)}
+                                    style={S.txRow}
+                                    className="ft-tx-row"
+                                    role="button"
+                                    tabIndex={0}
+                                    onKeyDown={e => e.key === "Enter" && setSelectedTx(t)}
+                                >
+                                    <div style={{
+                                        ...S.txIcon,
+                                        background: isExp ? "rgba(220,38,38,0.08)" : "rgba(45,106,79,0.08)",
+                                    }}>
+                                        {isExp ? (
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#DC2626" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="12" y1="5" x2="12" y2="19"/>
+                                                <polyline points="19 12 12 19 5 12"/>
+                                            </svg>
+                                        ) : (
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#2D6A4F" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                                                <line x1="12" y1="19" x2="12" y2="5"/>
+                                                <polyline points="5 12 12 5 19 12"/>
+                                            </svg>
+                                        )}
+                                    </div>
+                                    <div style={S.txMid}>
+                                        <span style={S.txDesc}>{t.description}</span>
+                                        <span style={S.txMeta}>{t.category} · {timeStr}</span>
+                                    </div>
+                                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+                                        <span style={{ ...S.txAmt, color: isExp ? "#DC2626" : "#2D6A4F" }}>
+                                            {isExp ? "−" : "+"}₦{t.amount.toLocaleString()}
+                                        </span>
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#D1D5DB" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                            <polyline points="9 18 15 12 9 6"/>
+                                        </svg>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
             </div>
+
+            {/* ── Transaction detail modal ── */}
+            <TxDetailModal tx={selectedTx} onClose={() => setSelectedTx(null)} />
         </div>
     );
 }
 
-/* ── Styles ──────────────────────────────────────────────────────────────── */
+/* ── Card styles ─────────────────────────────────────────────────────────── */
 const S = {
     wrapper: { display: "flex", flexDirection: "column", gap: 14 },
 
@@ -826,19 +956,166 @@ const S = {
         cursor: "not-allowed",
     },
     empty: { fontSize: 13, color: "#9CA3AF", textAlign: "center", padding: "2rem 0" },
-    table: { width: "100%", borderCollapse: "collapse", minWidth: 480 },
-    th: {
-        padding: "10px 16px",
-        fontSize: 10.5,
+
+    /* Today's transactions list */
+    countBadge: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: "#fff",
+        background: "#2D6A4F",
+        padding: "2px 8px",
+        borderRadius: 20,
+    },
+    txScroll: {
+        maxHeight: 340,
+        overflowY: "auto",
+        scrollbarWidth: "thin",
+        scrollbarColor: "#E5E7EB transparent",
+    },
+    txRow: {
+        display: "flex",
+        alignItems: "center",
+        gap: 12,
+        padding: "10px 8px",
+        borderRadius: 10,
+        cursor: "pointer",
+        borderBottom: "1px solid #F3F4F6",
+        transition: "background 0.15s",
+        outline: "none",
+    },
+    txIcon: {
+        width: 38,
+        height: 38,
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+    },
+    txMid: { flex: 1, minWidth: 0 },
+    txDesc: {
+        fontSize: 13.5,
         fontWeight: 600,
-        color: "#6B7280",
-        textAlign: "left",
-        background: "#F9FAFB",
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
+        color: "#111827",
+        display: "block",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
         whiteSpace: "nowrap",
     },
-    tr: { borderTop: "1px solid #F3F4F6" },
-    td: { padding: "11px 16px", fontSize: 13, color: "#374151", whiteSpace: "nowrap" },
+    txMeta: {
+        fontSize: 11.5,
+        color: "#9CA3AF",
+        display: "block",
+        marginTop: 2,
+    },
+    txAmt: {
+        fontSize: 13.5,
+        fontWeight: 700,
+    },
 };
 
+/* ── Modal styles ────────────────────────────────────────────────────────── */
+const SM = {
+    overlay: {
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.45)",
+        zIndex: 1000,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+    },
+    panel: {
+        background: "#fff",
+        borderRadius: 18,
+        padding: "22px 22px 18px",
+        width: "min(440px, 100%)",
+        boxShadow: "0 24px 64px rgba(0,0,0,0.22)",
+        display: "flex",
+        flexDirection: "column",
+        gap: 14,
+    },
+    header: {
+        display: "flex",
+        alignItems: "flex-start",
+        gap: 12,
+    },
+    typeBadge: {
+        display: "inline-block",
+        fontSize: 10.5,
+        fontWeight: 700,
+        textTransform: "uppercase",
+        letterSpacing: "0.07em",
+        padding: "3px 9px",
+        borderRadius: 20,
+        marginBottom: 6,
+    },
+    desc: {
+        fontSize: 17,
+        fontWeight: 700,
+        color: "#111827",
+        margin: 0,
+        lineHeight: 1.35,
+    },
+    closeBtn: {
+        flexShrink: 0,
+        width: 30,
+        height: 30,
+        borderRadius: "50%",
+        background: "#F3F4F6",
+        border: "none",
+        cursor: "pointer",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        color: "#6B7280",
+        marginTop: 2,
+    },
+    amountBlock: {
+        fontSize: 30,
+        fontWeight: 800,
+        letterSpacing: "-0.5px",
+        padding: "14px 16px",
+        borderRadius: 12,
+        textAlign: "center",
+    },
+    grid: {
+        border: "1px solid #F3F4F6",
+        borderRadius: 12,
+        overflow: "hidden",
+    },
+    detailRow: {
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "10px 14px",
+        borderBottom: "1px solid #F3F4F6",
+        gap: 12,
+    },
+    detailLabel: {
+        fontSize: 12.5,
+        color: "#6B7280",
+        fontWeight: 500,
+        flexShrink: 0,
+    },
+    detailValue: {
+        fontSize: 13,
+        color: "#111827",
+        fontWeight: 600,
+        textAlign: "right",
+        wordBreak: "break-word",
+    },
+    footerClose: {
+        width: "100%",
+        padding: "11px 0",
+        borderRadius: 10,
+        border: "1px solid #E5E7EB",
+        background: "#F9FAFB",
+        fontSize: 13.5,
+        fontWeight: 600,
+        color: "#374151",
+        cursor: "pointer",
+        fontFamily: "inherit",
+    },
+};

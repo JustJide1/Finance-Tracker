@@ -4,7 +4,7 @@ import { useAI } from "../hooks/useAI";
 import { useToast } from "./Toast";
 import CATEGORIES from "../constants/categories";
 
-const EXAMPLES = ["Spent 2k on lunch today", "Got paid 10k for salary"];
+const EXAMPLES = ["Spent 2k on lunch today"];
 
 const REVIEW_FIELDS = [
     { label: "Type", field: "type", type: "select", options: ["expense", "income"] },
@@ -252,7 +252,7 @@ function QuickAdd({ onSuccess }) {
     }, [input, parseTransaction, saveTransaction, toast]);
 
     const handleConfirm = useCallback(async () => {
-        if (!parsed?.amount || parsed.amount <= 0) return toast.error("Please enter a valid amount");
+        if (!parsed?.amount || parsed.amount <= 0) return toast.error("Amount must be greater than 0");
         await saveTransaction(parsed, {
             aiSuggestedCategory: parsed._aiCategory ?? null,
             aiConfidence: parsed._aiConfidence ?? null,

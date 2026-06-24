@@ -52,6 +52,7 @@ export default function Income() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.amount || !form.category || !form.description || !form.date) return toast.error("All fields are required");
+        if (parseFloat(form.amount) <= 0) return toast.error("Amount must be greater than 0");
         setLoading(true);
         try {
             const payload = { type: "income", amount: parseFloat(form.amount), category: form.category, description: form.description, date: form.date };
